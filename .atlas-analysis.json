@@ -1,0 +1,169 @@
+{
+  "projectType": "framework",
+  "projectName": "RAPTOR",
+  "projectDescription": "Autonomous offensive/defensive security research framework that turns Claude Code into an AI security agent for vulnerability analysis, exploit generation, and patch creation.",
+  "theme": "aspen",
+  "primaryColor": "#fc5404",
+  "lightColor": "#ee9c6c",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/agents-and-skills",
+              "concepts/tiered-expertise",
+              "concepts/adversarial-thinking"
+            ]
+          },
+          {
+            "group": "Security Testing",
+            "pages": [
+              "testing/static-analysis",
+              "testing/codeql",
+              "testing/binary-fuzzing",
+              "testing/web-scanning",
+              "testing/exploitability-validation"
+            ]
+          },
+          {
+            "group": "Analysis & Exploitation",
+            "pages": [
+              "analysis/vulnerability-analysis",
+              "analysis/exploit-generation",
+              "analysis/patch-creation",
+              "analysis/crash-analysis"
+            ]
+          },
+          {
+            "group": "Advanced Features",
+            "pages": [
+              "advanced/oss-forensics",
+              "advanced/multi-agent-orchestration",
+              "advanced/cost-management",
+              "advanced/llm-configuration"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/claude-code-usage",
+              "guides/python-cli",
+              "guides/extending-raptor",
+              "guides/creating-personas"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Commands",
+            "pages": [
+              "api/commands/scan",
+              "api/commands/fuzz",
+              "api/commands/web",
+              "api/commands/agentic",
+              "api/commands/codeql",
+              "api/commands/analyze",
+              "api/commands/exploit",
+              "api/commands/patch",
+              "api/commands/validate",
+              "api/commands/crash-analysis",
+              "api/commands/oss-forensics"
+            ]
+          },
+          {
+            "group": "Packages",
+            "pages": [
+              "api/packages/static-analysis",
+              "api/packages/codeql",
+              "api/packages/llm-analysis",
+              "api/packages/fuzzing",
+              "api/packages/binary-analysis",
+              "api/packages/exploitability-validation",
+              "api/packages/autonomous",
+              "api/packages/web"
+            ]
+          },
+          {
+            "group": "Agents",
+            "pages": [
+              "api/agents/overview",
+              "api/agents/offsec-specialist",
+              "api/agents/crash-analysis",
+              "api/agents/exploitability-validator",
+              "api/agents/oss-forensics"
+            ]
+          },
+          {
+            "group": "Expert Personas",
+            "pages": [
+              "api/personas/overview",
+              "api/personas/exploit-developer",
+              "api/personas/crash-analyst",
+              "api/personas/codeql-analyst",
+              "api/personas/fuzzing-strategist",
+              "api/personas/binary-exploitation-specialist"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Resources",
+        "groups": [
+          {
+            "group": "Resources",
+            "pages": [
+              "resources/dependencies",
+              "resources/devcontainer",
+              "resources/testing",
+              "resources/faq",
+              "resources/contributing"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Autonomous vulnerability scanning with Semgrep and CodeQL",
+    "Binary fuzzing with AFL++ and crash analysis",
+    "LLM-powered exploit generation and patch creation",
+    "Multi-agent orchestration for security research",
+    "Exploitability validation pipeline",
+    "OSS forensics investigation",
+    "Progressive expertise loading with 9 expert personas",
+    "Cost management with LiteLLM integration"
+  ],
+  "publicApiSurface": [
+    "/scan - Static code analysis",
+    "/fuzz - Binary fuzzing",
+    "/web - Web application testing",
+    "/agentic - Full autonomous workflow",
+    "/codeql - CodeQL deep analysis",
+    "/analyze - LLM vulnerability analysis",
+    "/exploit - Exploit generation",
+    "/patch - Patch creation",
+    "/validate - Exploitability validation",
+    "/crash-analysis - Crash root-cause analysis",
+    "/oss-forensics - GitHub forensic investigation",
+    "raptor.py - Main launcher",
+    "raptor_agentic.py - Source code workflow",
+    "raptor_codeql.py - CodeQL workflow",
+    "raptor_fuzzing.py - Binary fuzzing workflow"
+  ]
+}
