@@ -1,0 +1,176 @@
+---
+title: '/test-workflows'
+description: 'Run the RAPTOR automated test suite to validate all commands'
+icon: 'flask'
+---
+
+## Overview
+
+The `/test-workflows` command runs RAPTOR's comprehensive test suite to validate that all commands and user scenarios work correctly.
+
+<Info>
+This command is a **stub** - it triggers the test suite execution but the full workflow testing implementation is still in development.
+</Info>
+
+## What It Tests
+
+The test suite validates:
+
+1. **Basic scan** - Findings detection without exploit generation
+2. **Full agentic workflow** - Complete scan → exploit → patch pipeline
+3. **Binary fuzzing** - AFL++ integration and crash collection
+4. **Manual crash validation** - Crash analysis workflow
+5. **Tool routing** - Correct command execution paths
+
+## Usage
+
+```bash
+/test-workflows
+```
+
+This executes the test suite via:
+
+```bash
+bash test/test_workflows.sh
+```
+
+## Test Output
+
+Each test produces one of three results:
+
+- ✓ **PASS** - Test completed successfully
+- ✗ **FAIL** - Test failed with errors
+- ⊘ **SKIP** - Test skipped (dependencies missing)
+
+### Summary Format
+
+```
+=== Test Results ===
+Passed: 15
+Failed: 0
+Skipped: 2
+
+Total: 17 tests
+Status: ALL PASSED
+```
+
+Exit codes:
+- `0` - All tests passed
+- `1` - One or more tests failed
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Validate Changes" icon="check">
+    Run after modifying RAPTOR code
+  </Card>
+  <Card title="Pre-Release Testing" icon="rocket">
+    Verify workflows before releases
+  </Card>
+  <Card title="Regression Detection" icon="bug">
+    Catch breaking changes early
+  </Card>
+  <Card title="CI/CD Integration" icon="circle-nodes">
+    Automate testing in pipelines
+  </Card>
+</CardGroup>
+
+## Duration
+
+Typical test suite execution time: **2-3 minutes**
+
+Individual test timings:
+- Basic scan: ~30 seconds
+- Agentic workflow: ~60 seconds
+- Binary fuzzing: ~45 seconds
+- Crash validation: ~20 seconds
+- Tool routing: ~10 seconds
+
+## Example Output
+
+```bash
+$ /test-workflows
+
+Running RAPTOR test suite...
+
+[1/5] Basic scan workflow... ✓ PASS (28s)
+[2/5] Full agentic workflow... ✓ PASS (62s)
+[3/5] Binary fuzzing... ✓ PASS (41s)
+[4/5] Crash validation... ✓ PASS (19s)
+[5/5] Tool routing... ✓ PASS (8s)
+
+=== Test Results ===
+Passed: 5
+Failed: 0
+Skipped: 0
+
+Total: 5 tests
+Status: ALL PASSED
+
+Duration: 158 seconds
+```
+
+## CI/CD Integration
+
+Add to your continuous integration pipeline:
+
+```yaml GitHub Actions
+- name: Run RAPTOR tests
+  run: |
+    cd raptor
+    bash test/test_workflows.sh
+```
+
+```yaml GitLab CI
+test:
+  script:
+    - cd raptor
+    - bash test/test_workflows.sh
+  allow_failure: false
+```
+
+## Troubleshooting
+
+### Tests Fail with Missing Tools
+
+Ensure all dependencies are installed:
+
+```bash
+# Check Semgrep
+semgrep --version
+
+# Check AFL++
+afl-fuzz -h
+
+# Check Python packages
+pip install -r requirements.txt
+```
+
+### Tests Skip Due to Permissions
+
+Some tests require elevated permissions:
+
+```bash
+# Run with appropriate permissions
+sudo bash test/test_workflows.sh
+```
+
+### Test Timeouts
+
+Increase timeout limits for slow systems:
+
+```bash
+export TEST_TIMEOUT=300  # 5 minutes per test
+bash test/test_workflows.sh
+```
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Testing Guide" icon="vial" href="/resources/testing">
+    Comprehensive testing documentation
+  </Card>
+  <Card title="Contributing" icon="code-pull-request" href="/resources/contributing">
+    How to add new tests
+  </Card>
+</CardGroup>

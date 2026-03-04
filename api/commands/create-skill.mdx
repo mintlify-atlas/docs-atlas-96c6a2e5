@@ -1,0 +1,176 @@
+---
+title: '/create-skill'
+description: 'Save custom security testing approaches as reusable skills'
+icon: 'floppy-disk'
+---
+
+## Overview
+
+The `/create-skill` command helps you capture successful custom security testing approaches and save them as reusable specialist skills that can auto-load in future sessions.
+
+<Note>
+This feature is in **alpha** - skills are created and saved, but auto-loading integration is not yet fully implemented.
+</Note>
+
+## When to Use
+
+Save an approach as a skill after you've found success with:
+
+- Custom analysis focus (e.g., "focus on API security only")
+- Custom priority ordering (e.g., "check auth before secrets")
+- Specific testing methodologies that worked well
+- Domain-specific patterns (e.g., "mobile app security patterns")
+
+## Usage
+
+```bash
+/create-skill
+```
+
+Claude will guide you through the skill creation process interactively.
+
+## Skill Creation Process
+
+<Steps>
+  <Step title="Capture Successful Approach">
+    Describe what made your approach successful:
+    
+    - Custom priorities used
+    - Specific focus areas
+    - Testing techniques employed
+    - Domain expertise applied
+  </Step>
+
+  <Step title="Define Skill Parameters">
+    Specify how the skill should be used:
+    
+    - **Name**: Descriptive identifier (e.g., `api_security_auth_focus`)
+    - **Keywords**: Trigger words for auto-loading
+    - **Domain**: Target types where skill applies
+  </Step>
+
+  <Step title="Extract Reusable Patterns">
+    Review and generalize the approach:
+    
+    - Identify generalizable patterns
+    - Remove target-specific details
+    - Document tool combinations
+    - Define reusable priorities
+  </Step>
+
+  <Step title="Validate Token Budget">
+    Ensure the skill fits within limits:
+    
+    - Maximum 500 tokens per skill
+    - Warning at 10+ total custom skills
+    - Consider consolidation if approaching limits
+  </Step>
+</Steps>
+
+## Skill Structure
+
+Skills are saved to `tiers/specialists/custom/[skill_name].md` with this format:
+
+```markdown
+# [Skill Name]
+# Created: [date]
+# Source: Successful approach from [session]
+# Token cost: [X] tokens
+# Auto-loads: [trigger keywords]
+
+## Core Philosophy
+[What makes this approach unique/successful]
+
+## When to Use
+[Target types and situations]
+
+## Approach
+[Priorities, techniques, and tools]
+
+## Integration with Python
+[How this guides execution parameters]
+```
+
+## Token Budget Guidelines
+
+<Tabs>
+  <Tab title="Skill Size">
+    - **Minimum**: 200 tokens (enough for useful content)
+    - **Recommended**: 300-400 tokens (sweet spot)
+    - **Maximum**: 500 tokens (hard limit, enforced)
+  </Tab>
+
+  <Tab title="Total Skills">
+    - **5 skills**: 1,500-2,000 tokens (acceptable)
+    - **10 skills**: 3,000-4,000 tokens (approaching budget limit)
+    - **15+ skills**: Consider consolidating or removing unused skills
+  </Tab>
+</Tabs>
+
+## Example
+
+```
+User: /create-skill
+
+Claude: What successful approach should we save?
+
+User: "We focused on API authentication, checking auth bypass before 
+      anything else, and it found critical issues faster"
+
+Claude:
+  ✓ Extracting approach patterns...
+
+  Skill preview:
+  - Name: api_auth_priority
+  - Keywords: API, REST, authentication, auth bypass
+  - Focus: Authentication issues in web APIs
+  - Priority: Auth bypass → API security → Input validation
+  - Size: 380 tokens ✓
+
+  Create this skill? [Y/n/Customize]
+```
+
+## Quality Checks
+
+Before saving a skill, ensure:
+
+- Not overfitted to one specific target
+- Token limit respected (under 500 tokens)
+- Keywords defined for auto-loading
+- Approach clearly documented
+- Integration with Python parameters explained
+
+## Managing Skills
+
+Skills are stored in `tiers/specialists/custom/`
+
+**Common operations:**
+
+```bash
+# List all custom skills
+ls tiers/specialists/custom/
+
+# Disable a skill temporarily
+mv skill_name.md skill_name.md.disabled
+
+# Remove a skill
+rm tiers/specialists/custom/skill_name.md
+
+# Edit a skill
+vim tiers/specialists/custom/skill_name.md
+```
+
+<Tip>
+If you have 5+ custom skills, RAPTOR will prompt you quarterly to review usage stats and consider consolidation.
+</Tip>
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Creating Personas" icon="user-tie" href="/guides/creating-personas">
+    Create custom expert personas
+  </Card>
+  <Card title="Extending RAPTOR" icon="puzzle-piece" href="/guides/extending-raptor">
+    Add new framework capabilities
+  </Card>
+</CardGroup>
