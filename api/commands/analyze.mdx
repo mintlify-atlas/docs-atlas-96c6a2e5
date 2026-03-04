@@ -1,0 +1,207 @@
+---
+title: "/analyze"
+description: "RAPTOR LLM-based vulnerability analysis"
+---
+
+## Overview
+
+The `/analyze` command performs LLM-based analysis of existing SARIF findings from previous security scans. It provides deep adversarial thinking, exploitability assessment, and detailed vulnerability explanations.
+
+## Syntax
+
+```bash
+python3 raptor.py analyze --repo <path> --sarif <sarif-file> [options]
+```
+
+## Parameters
+
+<ParamField path="repo" type="string" required>
+  Absolute path to the code repository
+</ParamField>
+
+<ParamField path="sarif" type="string" required>
+  Path to SARIF file containing scan findings
+</ParamField>
+
+<ParamField path="max-findings" type="integer">
+  Maximum number of findings to analyze (default: unlimited)
+</ParamField>
+
+## What It Does
+
+1. Loads existing SARIF findings from previous scans
+2. Analyzes each vulnerability with LLM
+3. Applies adversarial thinking and attack surface mapping
+4. Assesses exploitability and impact
+5. Identifies root causes and attack vectors
+6. Generates detailed analysis reports
+
+## When to Use
+
+### Use `/analyze` When:
+
+- You already have SARIF files from previous scans
+- Want to re-analyze findings without re-scanning
+- Need deeper insight into specific vulnerabilities
+- Combining scanner output from multiple tools
+- Performing iterative analysis
+
+### Use `/agentic` When:
+
+- Starting from scratch (no existing findings)
+- Want end-to-end workflow
+- Need both scanning and analysis
+
+## Examples
+
+### Analyze Existing Scan Results
+
+```bash
+# First, run a scan
+python3 raptor.py scan --repo /path/to/code
+
+# Then, analyze the results
+python3 raptor.py analyze --repo /path/to/code --sarif out/scan_*/findings.sarif
+```
+
+Analyzes findings from a previous scan.
+
+### Analyze Specific Findings
+
+```bash
+python3 raptor.py analyze --repo /path/to/code --sarif findings.sarif --max-findings 5
+```
+
+Focuses on the first 5 most critical findings.
+
+### Combine Multiple Scanners
+
+```bash
+# Run Semgrep
+python3 raptor.py scan --repo /path/to/code
+
+# Run CodeQL
+python3 raptor.py codeql --repo /path/to/code
+
+# Analyze combined results
+python3 raptor.py analyze --repo /path/to/code --sarif combined-findings.sarif
+```
+
+Analyzes findings from multiple security tools.
+
+## Analysis Capabilities
+
+### Adversarial Thinking
+
+The LLM applies offensive security mindset:
+
+- Attack surface identification
+- Exploitation path discovery
+- Bypass technique analysis
+- Chaining vulnerability assessment
+
+### Exploitability Assessment
+
+Evaluates practical exploitability:
+
+- **Exploitable**: Clear path to code execution
+- **Likely exploitable**: High confidence with some constraints
+- **Difficult**: Primitives exist but hard to chain
+- **Unlikely**: Blocked by mitigations
+- **Ruled out**: False positive or unexploitable
+
+### Root Cause Analysis
+
+Identifies underlying issues:
+
+- Input validation failures
+- Trust boundary violations
+- Unsafe API usage
+- Logic flaws
+- Design weaknesses
+
+## Output Structure
+
+```
+out/analyze_<timestamp>/
+├── analysis-report.md       # Detailed findings
+├── findings-analyzed.json   # Structured results
+├── exploitability-matrix.csv
+└── recommendations.md       # Fix guidance
+```
+
+## Analysis Report Format
+
+```markdown
+# Vulnerability Analysis Report
+
+## VULN-001: SQL Injection in user_login()
+
+**Severity**: Critical  
+**Exploitability**: Exploitable  
+**Location**: src/auth.py:142
+
+### Root Cause
+Unsanitized user input concatenated into SQL query.
+
+### Attack Vector
+1. Attacker provides malicious input: `admin' OR '1'='1`
+2. Query becomes: `SELECT * FROM users WHERE name='admin' OR '1'='1'`
+3. Authentication bypass achieved
+
+### Impact
+- Complete authentication bypass
+- Database enumeration possible
+- Potential privilege escalation
+
+### Recommendations
+- Use parameterized queries
+- Implement input validation
+- Apply principle of least privilege
+```
+
+## Use Cases
+
+- Re-analyzing findings without re-scanning
+- Getting second opinion on scanner results
+- Prioritizing vulnerability remediation
+- Understanding complex vulnerabilities
+- Security research and documentation
+
+## Progressive Loading
+
+<Info>
+  When analysis completes, RAPTOR automatically loads `tiers/analysis-guidance.md` for enhanced adversarial thinking capabilities.
+</Info>
+
+The analysis uses progressive context loading:
+
+1. **Initial Analysis**: Base LLM knowledge
+2. **Enhanced Analysis**: Loads offensive security guidance
+3. **Exploit Development**: Loads exploit constraint analysis
+4. **Recovery**: Loads error recovery protocols if needed
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="/scan" href="/api/commands/scan">
+    Generate SARIF findings to analyze
+  </Card>
+  <Card title="/codeql" href="/api/commands/codeql">
+    Deep static analysis for complex issues
+  </Card>
+  <Card title="/validate" href="/api/commands/validate">
+    Validate exploitability before analysis
+  </Card>
+  <Card title="/exploit" href="/api/commands/exploit">
+    Generate exploits from analysis
+  </Card>
+</CardGroup>
+
+## Notes
+
+- Requires existing SARIF file from previous scan
+- Analysis quality depends on LLM model capabilities
+- Use with `/validate` for exploitability verification
+- Output includes prioritization for remediation
+- For security research and authorized testing only

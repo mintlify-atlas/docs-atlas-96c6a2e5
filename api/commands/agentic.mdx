@@ -1,0 +1,208 @@
+---
+title: "/agentic"
+description: "RAPTOR full autonomous security workflow"
+---
+
+## Overview
+
+The `/agentic` command runs RAPTOR's fully autonomous security testing workflow. It combines scanning, validation, analysis, exploit generation, and patch generation into a single end-to-end pipeline.
+
+<Info>
+  This is RAPTOR's most powerful command. It autonomously performs the entire security research workflow without manual intervention.
+</Info>
+
+## Syntax
+
+```bash
+python3 raptor.py agentic --repo <path> [options]
+```
+
+## Parameters
+
+<ParamField path="repo" type="string" required>
+  Absolute path to the code repository to analyze
+</ParamField>
+
+<ParamField path="max-findings" type="integer">
+  Maximum number of findings to process (default: unlimited)
+</ParamField>
+
+<ParamField path="skip-validation" type="boolean">
+  Skip Phase 2 exploitability validation (not recommended)
+</ParamField>
+
+<ParamField path="no-exploits" type="boolean">
+  Skip exploit generation (patch generation only)
+</ParamField>
+
+<ParamField path="no-patches" type="boolean">
+  Skip patch generation (exploit generation only)
+</ParamField>
+
+<ParamField path="sarif" type="string">
+  Use existing SARIF file instead of running new scan
+</ParamField>
+
+## Workflow Phases
+
+The agentic workflow executes these phases automatically:
+
+### Phase 1: Scanning
+
+- Runs Semgrep and CodeQL static analysis
+- Generates SARIF files with findings
+- Deduplicates identical vulnerabilities
+
+### Phase 2: Validation (NEW)
+
+<Note>
+  Phase 2 validation is automatically enabled in agentic mode. It filters out false positives before expensive exploit generation.
+</Note>
+
+- Validates that findings are real and reachable
+- Checks exploitability constraints
+- Filters out test code and dead code
+- See `/validate` command for details
+
+### Phase 3: Analysis
+
+- LLM-based deep analysis of each finding
+- Adversarial thinking and attack surface mapping
+- Exploitability assessment
+- Root cause identification
+
+### Phase 4: Exploit Generation
+
+- Generates proof-of-concept exploit code
+- Creates working exploits in Python, C, or pwntools
+- Validates exploitability constraints
+- Saved to `out/*/exploits/`
+
+### Phase 5: Patch Generation
+
+- Generates secure patches for each vulnerability
+- Provides fix recommendations
+- Creates patch files ready to apply
+- Saved to `out/*/patches/`
+
+## Examples
+
+### Full Autonomous Workflow
+
+```bash
+python3 raptor.py agentic --repo /path/to/code
+```
+
+Runs complete workflow: scan → validate → analyze → exploit → patch.
+
+### Limited Findings
+
+```bash
+python3 raptor.py agentic --repo /path/to/code --max-findings 10
+```
+
+Processes only the first 10 findings for quick results.
+
+### Exploit Generation Only
+
+```bash
+python3 raptor.py agentic --repo /path/to/code --no-patches
+```
+
+Generates exploits but skips patch generation.
+
+### Patch Generation Only
+
+```bash
+python3 raptor.py agentic --repo /path/to/code --no-exploits
+```
+
+Generates patches but skips exploit generation.
+
+### Using Existing SARIF
+
+```bash
+python3 raptor.py agentic --repo /path/to/code --sarif findings.sarif --max-findings 5
+```
+
+Analyzes pre-existing scan results without re-scanning.
+
+### Skip Validation (Not Recommended)
+
+```bash
+python3 raptor.py agentic --repo /path/to/code --skip-validation
+```
+
+Bypasses validation phase (may waste time on false positives).
+
+## Output Structure
+
+```
+out/agentic_<timestamp>/
+├── findings.sarif           # Scan results
+├── validation/             # Validation reports
+│   ├── findings.json
+│   ├── attack-tree.json
+│   └── validation-report.md
+├── analysis/               # LLM analysis
+│   └── analysis-report.md
+├── exploits/              # Generated PoCs
+│   ├── exploit-001.py
+│   ├── exploit-002.c
+│   └── README.md
+└── patches/               # Secure fixes
+    ├── patch-001.diff
+    ├── patch-002.diff
+    └── README.md
+```
+
+## Use Cases
+
+- Comprehensive security audits
+- Automated vulnerability discovery and exploitation
+- Security research and analysis
+- Patch development
+- Red team operations
+- Bug bounty hunting
+
+## Safety Features
+
+<Warning>
+  Nothing is applied to your code automatically. All exploits and patches are generated in the `out/` directory for review.
+</Warning>
+
+- Exploits are only generated in the output directory
+- Patches are not automatically applied
+- All changes require manual review and approval
+- No destructive operations on source code
+
+## Performance Considerations
+
+- Full workflow can take 30-60 minutes for large codebases
+- Use `--max-findings` to limit processing time
+- Phase 2 validation adds 5-10 minutes but prevents wasted effort
+- Skip validation only if you trust scanner output completely
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="/scan" href="/api/commands/scan">
+    Quick static analysis only
+  </Card>
+  <Card title="/validate" href="/api/commands/validate">
+    Standalone validation pipeline
+  </Card>
+  <Card title="/exploit" href="/api/commands/exploit">
+    Exploit generation only
+  </Card>
+  <Card title="/patch" href="/api/commands/patch">
+    Patch generation only
+  </Card>
+</CardGroup>
+
+## Notes
+
+- Phase 2 validation is enabled by default (use `--skip-validation` to disable)
+- For defensive security research, education, and authorized penetration testing
+- Review all generated exploits and patches before use
+- Exploits are for educational and research purposes only

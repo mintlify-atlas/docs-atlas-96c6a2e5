@@ -1,0 +1,431 @@
+---
+title: System Architecture
+description: Understanding RAPTOR's modular architecture with 9 specialized packages and analysis engines
+---
+
+RAPTOR uses a modular architecture that separates concerns into clean, independent layers. This design enables standalone execution, parallel processing, and easy extension.
+
+## Architecture Overview
+
+RAPTOR is organized into three main layers:
+
+```
+raptor/
+├── core/                  # Shared utilities
+├── packages/              # Independent security capabilities
+│   ├── static-analysis/
+│   ├── codeql/
+│   ├── llm_analysis/
+│   ├── autonomous/
+│   ├── fuzzing/
+│   ├── binary_analysis/
+│   ├── recon/
+│   ├── sca/
+│   └── web/
+├── engine/                # Analysis engines
+├── tiers/                 # Expert personas
+├── out/                   # All outputs
+└── raptor*.py             # Entry points
+```
+
+## Core Layer
+
+The core layer provides minimal shared utilities that all packages need:
+
+### RaptorConfig (`core/config.py`)
+
+Centralized configuration management:
+
+```python
+class RaptorConfig:
+    @staticmethod
+    def get_raptor_root() -> Path:
+        """Get RAPTOR installation root"""
+
+    @staticmethod
+    def get_out_dir() -> Path:
+        """Get output directory (raptor/out/)"""
+
+    @staticmethod
+    def get_logs_dir() -> Path:
+        """Get logs directory (out/logs/)"""
+```
+
+**Key decisions:**
+- Single source of truth for all paths
+- Environment variable support (`RAPTOR_ROOT`)
+- Graceful fallback to auto-detection
+
+### Structured Logging (`core/logging.py`)
+
+Unified logging with audit trail:
+
+```python
+def get_logger(name: str = "raptor") -> logging.Logger:
+    """Get configured logger with JSONL audit trail"""
+```
+
+**Features:**
+- JSONL format for machine-readable logs
+- Console output for human readability
+- Timestamped log files (`raptor_<timestamp>.jsonl`)
+- Automatic log directory creation
+
+**Example log entry:**
+
+```json
+{
+  "timestamp": "2025-11-09 05:22:00,081",
+  "level": "INFO",
+  "logger": "raptor",
+  "module": "logging",
+  "function": "info",
+  "line": 111,
+  "message": "RAPTOR logging initialized"
+}
+```
+
+### SARIF Parser (`core/sarif/parser.py`)
+
+Parses and extracts data from SARIF 2.1.0 files:
+
+- `parse_sarif(sarif_path)` - Load and validate SARIF file
+- `get_findings(sarif)` - Extract finding list
+- `get_severity(result)` - Map SARIF levels to severity
+
+**Why separate?** SARIF parsing is shared by scanner, llm-analysis, and reporting. Centralization prevents duplication.
+
+## Packages Layer
+
+### Design Principles
+
+1. **One responsibility per package**
+2. **No cross-package imports** (only import from core)
+3. **Standalone executability** (each agent.py can run independently)
+4. **Clear CLI interface** (argparse, help text, examples)
+
+### Package: static-analysis
+
+**Purpose:** Static code analysis using Semgrep
+
+**Main entry point:** `scanner.py` at `packages/static-analysis/scanner.py:1`
+
+**CLI:**
+
+```bash
+python3 packages/static-analysis/scanner.py \
+  --repo /path/to/code \
+  --policy_groups secrets,owasp \
+  --output /path/to/output
+```
+
+**Responsibilities:**
+- Run Semgrep scans with configured policy groups
+- Parse and normalize SARIF outputs
+- Generate scan metrics (files scanned, findings count, severities)
+
+**Outputs:**
+- `semgrep_<policy>.sarif` - SARIF 2.1.0 findings per policy group
+- `scan_metrics.json` - Scan statistics
+- `verification.json` - Verification results
+
+### Package: codeql
+
+**Purpose:** Deep CodeQL analysis with autonomous dataflow validation
+
+**Main entry point:** `agent.py` at `packages/codeql/agent.py:1`
+
+**Components:**
+- `agent.py` - Main CodeQL workflow orchestrator
+- `autonomous_analyzer.py` - LLM-powered CodeQL analysis
+- `build_detector.py` - Automatic build system detection
+- `database_manager.py` - CodeQL database creation and management
+- `dataflow_validator.py` - Validates dataflow paths from CodeQL results
+- `dataflow_visualizer.py` - Generates visual dataflow diagrams
+- `language_detector.py` - Programming language detection
+- `query_runner.py` - CodeQL query execution
+
+**Key features:**
+- Automatic language and build system detection
+- Multi-language support (Python, Java, C/C++, JavaScript, Go, etc.)
+- Dataflow path validation to reduce false positives
+- Visual dataflow diagrams for complex taint flows
+
+**Outputs:**
+- `codeql_*.sarif` - CodeQL findings in SARIF format
+- `dataflow_*.json` - Validated dataflow paths
+- `dataflow_*.svg` - Visual dataflow diagrams
+- `codeql_analysis.json` - Analysis summary
+
+### Package: llm_analysis
+
+**Purpose:** LLM-powered autonomous vulnerability analysis
+
+**Main entry points:**
+- `agent.py` at `packages/llm_analysis/agent.py:1` - Standalone analysis (OpenAI/Anthropic compatible)
+- `orchestrator.py` - Multi-agent orchestration (requires Claude Code)
+
+**Responsibilities:**
+- Parse SARIF findings
+- Read vulnerable code files
+- Analyze exploitability with LLM reasoning
+- Generate working exploit PoCs (optional)
+- Create secure patches (optional)
+- Produce analysis reports
+
+**LLM abstraction:**
+
+```
+llm/
+├── client.py       # Unified client interface
+├── config.py       # API keys, model selection
+└── providers.py    # Provider implementations (Anthropic, OpenAI, local)
+```
+
+**Benefits:**
+- Provider-agnostic (swap OpenAI ↔ Anthropic easily)
+- Configurable via environment variables
+- Rate limiting and error handling
+
+### Package: autonomous
+
+**Purpose:** Autonomous agent capabilities for planning, memory, and validation
+
+**Components:**
+- `corpus_generator.py` - Intelligent fuzzing corpus generation
+- `dialogue.py` - Agent dialogue and interaction management
+- `exploit_validator.py` - Automated exploit code validation
+- `goal_planner.py` - Goal-oriented task planning
+- `memory.py` - Agent memory and context management
+- `planner.py` - Task decomposition and planning
+
+**Key features:**
+- Goal-oriented planning with LLM reasoning
+- Automatic exploit compilation and execution testing
+- Context-aware corpus generation for targeted fuzzing
+- Persistent memory across agent interactions
+
+### Package: fuzzing
+
+**Purpose:** Binary fuzzing orchestration using AFL++
+
+**Main entry point:** `afl_runner.py` at `packages/fuzzing/afl_runner.py:1`
+
+**Components:**
+- `afl_runner.py` - AFL++ process management and monitoring
+- `crash_collector.py` - Crash triage, deduplication, and ranking
+- `corpus_manager.py` - Seed corpus generation and management
+
+**Key features:**
+- Parallel fuzzing support (multiple AFL instances)
+- Automatic crash deduplication by signal
+- Early termination on crash threshold
+- Support for AFL-instrumented binaries and QEMU mode
+
+### Package: binary_analysis
+
+**Purpose:** Binary crash analysis and debugging using GDB
+
+**Main entry point:** `crash_analyser.py` at `packages/binary_analysis/crash_analyser.py:1`
+
+**Responsibilities:**
+- Analyze crash inputs using GDB
+- Extract stack traces, register states, disassembly
+- Classify crash types (stack overflow, heap corruption, use-after-free, etc.)
+- Provide context for LLM analysis
+
+**Crash types detected:**
+- Stack buffer overflows (SIGSEGV with stack address)
+- Heap corruption (SIGSEGV with heap address, malloc errors)
+- Use-after-free (SIGSEGV on freed memory)
+- Integer overflows (SIGFPE, wraparound detection)
+- Format string vulnerabilities (SIGSEGV in printf family)
+- NULL pointer dereference (SIGSEGV at low addresses)
+
+### Package: recon
+
+**Purpose:** Reconnaissance and technology enumeration
+
+**Responsibilities:**
+- Detect programming languages
+- Identify frameworks and libraries
+- Enumerate dependencies
+- Map attack surface
+
+### Package: sca
+
+**Purpose:** Software Composition Analysis (dependency vulnerabilities)
+
+**Responsibilities:**
+- Detect dependency files (requirements.txt, package.json, pom.xml, etc.)
+- Query vulnerability databases (OSV, NVD, etc.)
+- Generate dependency vulnerability reports
+- Suggest remediation (version upgrades)
+
+### Package: web
+
+**Purpose:** Web application security testing
+
+**Components:**
+- `client.py` - HTTP client wrapper (session management, headers)
+- `crawler.py` - Web crawler (enumerate endpoints)
+- `fuzzer.py` - Input fuzzing (injection testing)
+- `scanner.py` - Main orchestrator (OWASP Top 10 checks)
+
+## Analysis Engines
+
+### CodeQL Engine (`engine/codeql/`)
+
+Custom CodeQL query suites and configurations:
+
+- `suites/` - Custom CodeQL query suites for different languages
+- Query configurations for taint tracking, security patterns, and dataflow analysis
+
+**Usage:** Consumed by `packages/codeql/` for automated CodeQL scanning
+
+### Semgrep Engine (`engine/semgrep/`)
+
+Semgrep rules and configurations:
+
+- `rules/` - Custom Semgrep rules for security patterns
+- `semgrep.yaml` - Semgrep configuration file
+- `tools/` - Utilities for rule development and testing
+
+**Usage:** Consumed by `packages/static-analysis/scanner.py` for Semgrep scanning
+
+**Design rationale:** Separating analysis engines from packages allows for centralized rule management and easier rule updates without modifying package code.
+
+## Entry Points
+
+### raptor.py - Interactive Launcher
+
+**Purpose:** Interactive launcher with Claude Code integration
+
+**Features:**
+- Claude Code integration for conversational analysis
+- Progressive loading of expert personas from `tiers/`
+- Slash command support (`/scan`, `/fuzz`, `/web`, `/agentic`, `/codeql`, `/analyze`, `/exploit`, `/patch`)
+- On-demand loading of specialized guidance
+- Session-based workflow management
+
+### raptor_agentic.py - Source Code Workflow
+
+**Purpose:** End-to-end autonomous security testing workflow
+
+**Workflow:**
+1. **Phase 1:** Scan code with Semgrep
+2. **Phase 2:** Analyze findings autonomously
+3. **Phase 3:** (Optional) Agentic orchestration with Claude Code
+
+### raptor_codeql.py - CodeQL Workflow
+
+**Purpose:** End-to-end CodeQL analysis with dataflow validation
+
+**Workflow:**
+1. **Phase 1:** Language and build detection
+2. **Phase 2:** CodeQL database creation
+3. **Phase 3:** Query execution with custom suites
+4. **Phase 4:** Dataflow path validation
+5. **Phase 5:** Visual dataflow diagram generation
+6. **Phase 6:** LLM exploitability analysis (optional)
+
+### raptor_fuzzing.py - Binary Fuzzing Workflow
+
+**Purpose:** Autonomous binary fuzzing with LLM-powered crash analysis
+
+**Workflow:**
+1. **Phase 1:** Fuzz binary with AFL++
+2. **Phase 2:** Collect and rank crashes
+3. **Phase 3:** Analyze crashes with GDB
+4. **Phase 4:** LLM exploitability assessment
+5. **Phase 5:** Generate exploit PoC code
+
+## Output Structure
+
+All outputs are centralized in `out/`:
+
+```
+out/
+├── logs/                       # JSONL structured logs
+│   └── raptor_<timestamp>.jsonl
+├── scan_<repo>_<timestamp>/    # Scan outputs
+│   ├── semgrep_*.sarif
+│   ├── scan_metrics.json
+│   └── verification.json
+├── codeql_<repo>_<timestamp>/  # CodeQL outputs
+│   ├── database/
+│   ├── codeql_*.sarif
+│   ├── dataflow_*.json
+│   └── dataflow_*.svg
+└── fuzz_<binary>_<timestamp>/  # Fuzzing outputs
+    ├── afl_output/
+    ├── analysis/
+    └── fuzzing_report.json
+```
+
+## Import Patterns
+
+Packages only import from core, never from each other:
+
+```python
+# Add parent to path for core access
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from core.config import RaptorConfig
+from core.logging import get_logger
+```
+
+This ensures packages remain independent and standalone executable.
+
+## LLM Quality Considerations
+
+### Exploit Generation Requirements
+
+RAPTOR's exploit generation capabilities vary significantly based on the LLM provider:
+
+| Provider | Analysis | Patching | Exploit Generation | Cost per Crash |
+|----------|----------|----------|-------------------|----------------|
+| **Anthropic Claude** | Excellent | Excellent | Compilable C code | ~£0.01 |
+| **OpenAI GPT-4** | Excellent | Excellent | Compilable C code | ~£0.01 |
+| **Ollama (local)** | Good | Good | Often non-compilable | Free |
+
+### Technical Requirements for Exploit Code
+
+Generating working exploit code requires capabilities that distinguish frontier models from local models:
+
+**Memory layout understanding:**
+- Precise knowledge of x86-64/ARM stack structures
+- Correct register usage and calling conventions
+- Understanding of heap allocator internals (glibc malloc, tcache)
+
+**Shellcode generation:**
+- Valid x86-64/ARM assembly encoding
+- Correct escape sequences (e.g., `\x90\x31\xc0` not `\T`)
+- NULL-byte avoidance for string-based exploits
+- System call number correctness
+
+**Exploitation primitives:**
+- ROP chain construction with valid gadget addresses
+- Stack pivot techniques for limited buffer sizes
+- ASLR leak construction and information disclosure
+- Heap feng shui for use-after-free exploitation
+
+### Recommendations
+
+**For production exploit generation:**
+
+```bash
+# Use Anthropic Claude (recommended)
+export ANTHROPIC_API_KEY=your_key_here
+
+# OR OpenAI GPT-4
+export OPENAI_API_KEY=your_key_here
+```
+
+**For testing and analysis:**
+
+Ollama works well for crash triage, exploitability assessment, and vulnerability analysis, but not for C exploit generation, shellcode creation, or ROP chain construction.
+
+<Note>
+For security research where working exploits are required, the nominal cost of frontier models (£0.10-1.00 per binary) is justified by the quality of output.
+</Note>

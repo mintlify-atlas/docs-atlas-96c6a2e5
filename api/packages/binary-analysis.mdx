@@ -1,0 +1,528 @@
+---
+title: "Binary Analysis"
+description: "Crash analysis, debugging, and exploitability assessment for binary vulnerabilities"
+icon: "binary"
+---
+
+## Overview
+
+The Binary Analysis package provides comprehensive crash analysis capabilities for binary executables. It extracts exploitability information using debuggers (GDB/LLDB), disassembly, and LLM-powered analysis.
+
+## Purpose
+
+Analyze crashes and binaries with:
+- **Crash analysis**: Extract stack traces, registers, crash instructions
+- **Debugger integration**: GDB (Linux/Windows) and LLDB (macOS)
+- **Disassembly**: Function-level code analysis
+- **Exploitability assessment**: Automated triage
+- **Symbol table extraction**: Address-to-function mapping
+
+## Architecture
+
+```python
+packages/binary_analysis/
+├── crash_analyser.py      # Main crash analysis engine
+└── debugger.py            # GDB/LLDB integration
+```
+
+## Quick Start
+
+### Basic Crash Analysis
+
+```python
+from pathlib import Path
+from packages.binary_analysis import CrashAnalyser
+
+# Initialize analyzer
+analyser = CrashAnalyser(
+    binary_path=Path("/path/to/binary")
+)
+
+# Analyze a crash
+context = analyser.analyze_crash(
+    input_file=Path("crashes/crash_001"),
+    signal="SIGSEGV"
+)
+
+print(f"Crash Type: {context.crash_type}")
+print(f"Exploitability: {context.exploitability}")
+print(f"Stack Trace:\n{context.stack_trace}")
+print(f"Registers: {context.registers}")
+```
+
+### With LLM Analysis
+
+```python
+from packages.binary_analysis import CrashAnalyser
+from packages.llm_analysis import AutonomousSecurityAgentV2
+
+# 1. Extract crash context
+analyser = CrashAnalyser(Path("target_binary"))
+context = analyser.analyze_crash(
+    input_file=Path("crash_input"),
+    signal="SIGSEGV"
+)
+
+# 2. LLM analysis for deeper understanding
+agent = AutonomousSecurityAgentV2(
+    repo_path=Path("."),
+    out_dir=Path("out/analysis")
+)
+
+exploit = agent.generate_exploit_for_crash(context)
+print(f"Generated exploit:\n{exploit}")
+```
+
+## Core Classes
+
+### CrashAnalyser
+
+Main crash analysis engine.
+
+```python
+class CrashAnalyser:
+    def __init__(self, binary_path: Path)
+    
+    def analyze_crash(
+        self,
+        input_file: Path,
+        signal: str,
+        timeout: int = 30
+    ) -> CrashContext
+    
+    def get_stack_trace(
+        self,
+        input_file: Path
+    ) -> str
+    
+    def get_registers(
+        self,
+        input_file: Path
+    ) -> Dict[str, str]
+    
+    def get_crash_instruction(
+        self,
+        address: str
+    ) -> str
+    
+    def estimate_exploitability(
+        self,
+        context: CrashContext
+    ) -> str
+```
+
+<ParamField path="binary_path" type="Path" required>
+  Path to target binary executable
+</ParamField>
+
+### CrashContext
+
+Complete context for a crash.
+
+```python
+@dataclass
+class CrashContext:
+    crash_id: str
+    binary_path: Path
+    input_file: Path
+    signal: str
+    
+    # From debugger
+    stack_trace: str
+    registers: Dict[str, str]
+    crash_instruction: str
+    crash_address: str
+    stack_hash: str
+    
+    # From disassembly
+    disassembly: str
+    function_name: str
+    source_location: str
+    
+    # Binary information
+    binary_info: Dict[str, str]
+    
+    # Analysis results
+    exploitability: str
+    crash_type: str
+    cvss_estimate: float
+    analysis: Dict
+    
+    # Generated artifacts
+    exploit_code: Optional[str]
+```
+
+<ResponseField name="crash_id" type="str">
+  Unique crash identifier (SHA256 hash)
+</ResponseField>
+
+<ResponseField name="signal" type="str">
+  Signal that caused crash (SIGSEGV, SIGABRT, SIGILL, etc.)
+</ResponseField>
+
+<ResponseField name="stack_trace" type="str">
+  Full stack trace from debugger
+</ResponseField>
+
+<ResponseField name="registers" type="Dict[str, str]">
+  CPU register values at crash (PC, SP, etc.)
+</ResponseField>
+
+<ResponseField name="crash_instruction" type="str">
+  Disassembly of crashing instruction
+</ResponseField>
+
+<ResponseField name="exploitability" type="str">
+  Exploitability estimate: "exploitable", "likely", "unlikely", "not_exploitable"
+</ResponseField>
+
+<ResponseField name="crash_type" type="str">
+  Crash classification: "heap_overflow", "stack_overflow", "null_deref", "use_after_free", etc.
+</ResponseField>
+
+### GDBDebugger
+
+GDB integration for Linux/Windows binaries.
+
+```python
+from packages.binary_analysis import GDBDebugger
+
+debugger = GDBDebugger(binary_path=Path("target"))
+
+# Get stack trace
+stack_trace = debugger.get_stack_trace(
+    input_file=Path("crash_input")
+)
+
+# Get register dump
+registers = debugger.get_registers(
+    input_file=Path("crash_input")
+)
+
+print(f"PC: {registers['pc']}")
+print(f"SP: {registers['sp']}")
+```
+
+## Analysis Workflow
+
+### Complete Crash Triage
+
+```python
+from pathlib import Path
+from packages.binary_analysis import CrashAnalyser
+import json
+
+analyser = CrashAnalyser(Path("target_binary"))
+
+# Analyze multiple crashes
+crash_dir = Path("crashes/")
+results = []
+
+for crash_file in crash_dir.glob("id:*"):
+    # Extract signal from filename: id:000000,sig:11
+    signal_part = crash_file.name.split(",sig:")[1] if ",sig:" in crash_file.name else "11"
+    signal_map = {"11": "SIGSEGV", "6": "SIGABRT", "4": "SIGILL"}
+    signal = signal_map.get(signal_part, "SIGSEGV")
+    
+    # Analyze crash
+    context = analyser.analyze_crash(
+        input_file=crash_file,
+        signal=signal
+    )
+    
+    results.append({
+        "crash_id": context.crash_id,
+        "input": str(crash_file),
+        "signal": signal,
+        "type": context.crash_type,
+        "exploitability": context.exploitability,
+        "cvss": context.cvss_estimate,
+        "stack_hash": context.stack_hash
+    })
+
+# Sort by exploitability
+results.sort(key=lambda x: {
+    "exploitable": 4,
+    "likely": 3,
+    "unlikely": 2,
+    "not_exploitable": 1
+}.get(x["exploitability"], 0), reverse=True)
+
+# Save report
+with open("crash_triage.json", "w") as f:
+    json.dump(results, f, indent=2)
+
+print(f"Analyzed {len(results)} crashes")
+print(f"Exploitable: {sum(1 for r in results if r['exploitability'] == 'exploitable')}")
+```
+
+## Debugger Support
+
+### Automatic Detection
+
+The analyser automatically selects the appropriate debugger:
+
+```python
+# On Linux: uses GDB
+# On macOS: uses LLDB (for Mach-O binaries)
+# On Windows: uses GDB (if available)
+
+analyser = CrashAnalyser(binary_path)
+# Debugger auto-detected based on platform and binary type
+```
+
+### GDB Commands
+
+```python
+# Internally uses GDB batch mode
+commands = [
+    "run < input_file",
+    "bt full",           # Full backtrace
+    "info registers",    # Register dump
+    "x/i $pc",          # Crash instruction
+    "info frame",       # Frame info
+]
+```
+
+### LLDB Commands (macOS)
+
+```python
+# For macOS binaries
+commands = [
+    "process launch -i input_file",
+    "bt all",           # Backtrace
+    "register read",    # Registers
+    "disassemble -p",  # Crash instruction
+]
+```
+
+## Crash Classification
+
+### Automatic Classification
+
+The analyser classifies crashes based on:
+
+1. **Signal type**: SIGSEGV, SIGABRT, SIGILL, SIGFPE
+2. **Crash address**: NULL, heap, stack, code regions
+3. **Instruction pattern**: Write, read, execute, call
+4. **Stack trace patterns**: malloc/free, memcpy, strcpy
+
+### Crash Types
+
+| Type | Signal | Exploitability | Description |
+|------|--------|----------------|-------------|
+| `heap_overflow` | SIGSEGV | High | Heap buffer overflow |
+| `stack_overflow` | SIGSEGV | High | Stack buffer overflow |
+| `use_after_free` | SIGSEGV | High | Use-after-free |
+| `double_free` | SIGABRT | Medium | Double free |
+| `null_deref` | SIGSEGV | Low | NULL pointer dereference |
+| `integer_overflow` | SIGFPE | Medium | Integer overflow |
+| `format_string` | SIGSEGV | High | Format string vulnerability |
+
+## Exploitability Assessment
+
+### Heuristic Analysis
+
+```python
+context = analyser.analyze_crash(input_file, signal)
+
+# Exploitability factors:
+# - Crash type (heap overflow = high)
+# - Write vs read (write = higher)
+# - Control over crash address (PC control = exploitable)
+# - ASAN detection (heap bugs = exploitable)
+# - Stack trace patterns (strcpy/memcpy = likely)
+
+if context.exploitability == "exploitable":
+    print("High confidence exploitable vulnerability")
+elif context.exploitability == "likely":
+    print("Likely exploitable with some effort")
+```
+
+### Exploitability Levels
+
+| Level | Criteria | Action |
+|-------|----------|--------|
+| `exploitable` | PC control, heap overflow, format string | Immediate analysis |
+| `likely` | Stack overflow, UAF, double free | Deep analysis |
+| `unlikely` | NULL deref, assert failure | Low priority |
+| `not_exploitable` | Timeout, OOM, intentional abort | Skip |
+
+## Binary Information
+
+### Extract Binary Details
+
+```python
+context = analyser.analyze_crash(input_file, signal)
+
+print("Binary Information:")
+for key, value in context.binary_info.items():
+    print(f"  {key}: {value}")
+
+# Example output:
+# arch: x86_64
+# os: Linux
+# stripped: False
+# nx: True
+# pie: True
+# relro: Full
+# canary: True
+# asan: False
+```
+
+### Check Security Features
+
+```python
+from packages.exploit_feasibility import analyze_binary
+
+# Deep binary analysis
+result = analyze_binary("/path/to/binary")
+
+print(f"PIE: {result['mitigations']['pie_enabled']}")
+print(f"Canary: {result['mitigations']['stack_canary']}")
+print(f"NX: {result['mitigations']['nx_enabled']}")
+print(f"RELRO: {result['mitigations']['relro']}")
+```
+
+## Symbol Table
+
+### Address-to-Function Mapping
+
+```python
+# Symbol table automatically cached
+analyser = CrashAnalyser(binary_path)
+
+# Resolve crash address to function
+function = analyser._symbol_cache.get("0x401234")
+print(f"Crashed in function: {function}")
+```
+
+### Source Location
+
+```python
+# If debug symbols available
+if context.source_location:
+    print(f"Crash location: {context.source_location}")
+    # Example: "src/parser.c:145"
+```
+
+## Stack Hashing
+
+### Deduplication
+
+```python
+# Crashes with same stack_hash are duplicates
+crashes = []
+for input_file in crash_files:
+    context = analyser.analyze_crash(input_file, "SIGSEGV")
+    crashes.append(context)
+
+# Deduplicate by stack hash
+unique_crashes = {}
+for crash in crashes:
+    if crash.stack_hash not in unique_crashes:
+        unique_crashes[crash.stack_hash] = crash
+
+print(f"Total crashes: {len(crashes)}")
+print(f"Unique crashes: {len(unique_crashes)}")
+```
+
+## Configuration
+
+### Timeouts
+
+```python
+# Adjust crash analysis timeout
+context = analyser.analyze_crash(
+    input_file=crash_file,
+    signal="SIGSEGV",
+    timeout=60  # 60 seconds (default: 30)
+)
+```
+
+### Available Tools
+
+The analyser checks for these tools:
+
+- `nm` - Symbol table extraction
+- `addr2line` - Address to source resolution
+- `objdump` - Disassembly
+- `readelf` - ELF header analysis (Linux)
+- `file` - File type identification
+- `strings` - String extraction
+
+## Output Structure
+
+```
+out/crashes/
+├── crash_abc123/
+│   ├── input                  # Crashing input
+│   ├── stack_trace.txt        # Full stack trace
+│   ├── registers.txt          # Register dump
+│   ├── disassembly.txt        # Crash instruction disassembly
+│   ├── context.json           # CrashContext serialized
+│   └── analysis.json          # LLM analysis (if available)
+└── crash_def456/
+```
+
+## Integration
+
+### With Fuzzing
+
+```python
+from packages.fuzzing import AFLRunner, CrashCollector
+from packages.binary_analysis import CrashAnalyser
+
+# 1. Fuzz
+runner = AFLRunner(...)
+runner.run_parallel_fuzzers(...)
+
+# 2. Collect crashes
+collector = CrashCollector(...)
+crashes = collector.collect_crashes(...)
+
+# 3. Analyze
+analyser = CrashAnalyser(...)
+for crash in crashes:
+    context = analyser.analyze_crash(crash.input_file, crash.signal)
+```
+
+### With LLM Analysis
+
+```python
+from packages.llm_analysis import AutonomousSecurityAgentV2
+
+# Binary analysis -> LLM analysis
+context = analyser.analyze_crash(...)
+
+agent = AutonomousSecurityAgentV2(...)
+exploit = agent.generate_exploit_for_crash(context)
+patch = agent.generate_patch_for_crash(context)
+```
+
+## Related Packages
+
+- [Fuzzing](/api/packages/fuzzing) - Generate crashes to analyze
+- [LLM Analysis](/api/packages/llm-analysis) - AI-powered crash analysis
+- [Exploitability Validation](/api/packages/exploitability-validation) - Validate exploitability
+
+## Performance
+
+### Analysis Speed
+
+- **Per crash**: 5-15 seconds
+- **With symbols**: +2-5 seconds
+- **With ASAN**: +3-8 seconds (richer info)
+
+### Deduplication
+
+- **Stack hashing**: < 1 second per crash
+- **Typical deduplication**: 100 crashes → 10-20 unique
+
+## Best Practices
+
+1. **Compile with symbols** (`-g`) for better analysis
+2. **Enable ASAN** for heap bug detection
+3. **Prioritize by exploitability** (focus on "exploitable" first)
+4. **Deduplicate early** to avoid redundant analysis
+5. **Use LLM analysis** for complex crashes

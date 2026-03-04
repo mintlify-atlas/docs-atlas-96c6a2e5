@@ -1,0 +1,821 @@
+---
+title: Python Command-Line Interface
+description: Direct CLI usage, scripting, and CI/CD integration for automated security testing
+icon: terminal
+---
+
+The Python CLI provides direct command-line access to RAPTOR for scripting, automation, and CI/CD pipeline integration. All functionality available in Claude Code is also accessible via the command line.
+
+<Tip>
+Using Claude Code? See the [Claude Code Usage Guide](/guides/claude-code-usage) for interactive workflows.
+</Tip>
+
+## Quick Reference
+
+```bash
+# Full autonomous workflow
+python3 raptor.py agentic --repo /path/to/code
+
+# Static analysis only
+python3 raptor.py scan --repo /path/to/code --policy_groups secrets,owasp
+
+# Binary fuzzing
+python3 raptor.py fuzz --binary /path/to/binary --duration 3600
+
+# Web testing
+python3 raptor.py web --url https://example.com
+
+# CodeQL only
+python3 raptor.py codeql --repo /path/to/code --languages java
+
+# Analyze existing SARIF
+python3 raptor.py analyze --repo /path/to/code --sarif findings.sarif
+
+# Get help
+python3 raptor.py --help
+python3 raptor.py help scan
+```
+
+## Installation
+
+### Prerequisites
+
+<Steps>
+  <Step title="Python 3.9+">
+    Ensure Python 3.9 or higher is installed:
+    
+    ```bash
+    python3 --version
+    ```
+  </Step>
+  <Step title="Install Dependencies">
+    Install required Python packages:
+    
+    ```bash
+    pip install -r requirements.txt
+    pip install semgrep
+    ```
+  </Step>
+  <Step title="Set API Keys">
+    Configure LLM provider (required for autonomous analysis):
+    
+    ```bash
+    export ANTHROPIC_API_KEY="sk-ant-..."
+    # OR
+    export OPENAI_API_KEY="sk-..."
+    ```
+  </Step>
+</Steps>
+
+### Optional Tools
+
+For full functionality, install these optional tools:
+
+<AccordionGroup>
+  <Accordion title="AFL++ (Binary Fuzzing)" icon="bug">
+    ```bash
+    # macOS
+    brew install afl++
+    
+    # Ubuntu/Debian
+    apt install afl++
+    
+    # Build from source
+    git clone https://github.com/AFLplusplus/AFLplusplus
+    cd AFLplusplus
+    make
+    sudo make install
+    ```
+  </Accordion>
+  <Accordion title="CodeQL (Deep Analysis)" icon="magnifying-glass-chart">
+    ```bash
+    # Download CodeQL CLI
+    wget https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip
+    unzip codeql-linux64.zip
+    
+    # Add to PATH
+    export PATH="$PATH:/path/to/codeql"
+    
+    # Verify installation
+    codeql --version
+    ```
+  </Accordion>
+  <Accordion title="GDB/LLDB (Crash Analysis)" icon="bug-slash">
+    Usually pre-installed on most systems:
+    
+    ```bash
+    # Check if installed
+    gdb --version
+    lldb --version
+    
+    # Install if missing (Ubuntu/Debian)
+    apt install gdb
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Available Modes
+
+RAPTOR provides six operational modes:
+
+### 1. scan - Static Analysis
+
+Runs Semgrep for fast, pattern-based vulnerability detection:
+
+```bash
+python3 raptor.py scan --repo /path/to/code --policy_groups secrets,owasp
+```
+
+**Use Cases:**
+- Quick security scans in development
+- CI/CD pipeline integration
+- Pre-commit hooks
+- Finding low-hanging fruit
+
+**Arguments:**
+
+| Argument | Description | Default |
+|----------|-------------|--------|
+| `--repo` | Path to repository (required) | - |
+| `--policy-groups` | Comma-separated policy groups | `all` |
+| `--out` | Output directory | `out/scan_<timestamp>` |
+
+**Example:**
+
+```bash
+python3 raptor.py scan \
+  --repo ./my-app \
+  --policy-groups crypto,secrets \
+  --out ./security-results
+```
+
+### 2. agentic - Full Autonomous Workflow
+
+Comprehensive security testing with Semgrep, CodeQL, LLM analysis, exploit generation, and patch creation:
+
+```bash
+python3 raptor.py agentic --repo /path/to/code --max-findings 10
+```
+
+**Use Cases:**
+- Complete security assessments
+- Vulnerability research
+- Security audits
+- Automated penetration testing
+
+**Arguments:**
+
+| Argument | Description | Default |
+|----------|-------------|--------|
+| `--repo` | Path to repository (required) | - |
+| `--policy-groups` | Semgrep policy groups | `all` |
+| `--max-findings` | Maximum findings to process | `10` |
+| `--no-exploits` | Skip exploit generation | `false` |
+| `--no-patches` | Skip patch generation | `false` |
+| `--out` | Output directory | `out/scan_<timestamp>` |
+| `--mode` | Analysis mode (`fast`/`thorough`) | `thorough` |
+| `--codeql` | Enable CodeQL (auto-enabled) | `true` |
+| `--codeql-only` | Run CodeQL only (skip Semgrep) | `false` |
+| `--no-codeql` | Disable CodeQL | `false` |
+| `--languages` | Languages for CodeQL | auto-detect |
+| `--build-command` | Custom build command | auto-detect |
+| `--extended` | Use extended security suites | `false` |
+| `--no-visualizations` | Disable dataflow visualizations | `false` |
+| `--skip-validation` | Skip exploitability validation | `false` |
+| `--vuln-type` | Focus on specific vulnerability type | - |
+
+**Example:**
+
+```bash
+python3 raptor.py agentic \
+  --repo ./my-java-app \
+  --languages java \
+  --build-command "mvn clean compile -DskipTests" \
+  --max-findings 20 \
+  --extended
+```
+
+### 3. codeql - Deep Dataflow Analysis
+
+CodeQL-only analysis for complex dataflow vulnerabilities:
+
+```bash
+python3 raptor.py codeql --repo /path/to/code --languages java
+```
+
+**Use Cases:**
+- Finding complex dataflow vulnerabilities
+- SQL injection with sanitizers
+- Path traversal with validation
+- Taint analysis
+
+**Arguments:**
+
+| Argument | Description | Default |
+|----------|-------------|--------|
+| `--repo` | Path to repository (required) | - |
+| `--languages` | Languages to analyze | auto-detect |
+| `--build-command` | Custom build command | auto-detect |
+| `--extended` | Use extended security suites | `false` |
+| `--codeql-cli` | Path to CodeQL CLI | auto-detect |
+| `--out` | Output directory | `out/codeql_<timestamp>` |
+
+**Supported Languages:**
+- Java, JavaScript, TypeScript, Python, C/C++, C#, Go, Ruby
+
+**Example:**
+
+```bash
+python3 raptor.py codeql \
+  --repo ./my-app \
+  --languages javascript,typescript \
+  --extended
+```
+
+### 4. fuzz - Binary Fuzzing
+
+AFL++ fuzzing with crash analysis and exploit generation:
+
+```bash
+python3 raptor.py fuzz --binary /path/to/binary --duration 3600 --parallel 4
+```
+
+**Use Cases:**
+- Finding memory corruption vulnerabilities
+- Buffer overflows, use-after-free
+- Crash analysis
+- Binary security testing
+
+**Arguments:**
+
+| Argument | Description | Default |
+|----------|-------------|--------|
+| `--binary` | Binary to fuzz (required) | - |
+| `--duration` | Fuzzing duration (seconds) | `3600` |
+| `--parallel` | Parallel fuzzing instances | `1` |
+| `--input` | Seed corpus directory | auto-generate |
+| `--timeout` | Execution timeout (ms) | auto-detect |
+| `--out` | Output directory | `out/fuzz_<timestamp>` |
+
+**Example:**
+
+```bash
+python3 raptor.py fuzz \
+  --binary ./target-binary \
+  --duration 7200 \
+  --parallel 8 \
+  --input ./seed-corpus \
+  --timeout 1000
+```
+
+### 5. web - Web Application Testing
+
+OWASP Top 10 testing for web applications:
+
+```bash
+python3 raptor.py web --url https://example.com
+```
+
+<Warning>
+The `/web` mode is currently **in alpha** and should not be relied upon for production security testing. It's a stub implementation.
+</Warning>
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `--url` | Target URL (required) |
+| `--out` | Output directory |
+
+### 6. analyze - LLM Analysis Only
+
+Analyze existing SARIF files without running scans:
+
+```bash
+python3 raptor.py analyze --repo /path/to/code --sarif findings.sarif --max-findings 10
+```
+
+**Use Cases:**
+- Analyzing results from other tools
+- Re-analyzing previous scans
+- Integrating with existing security pipelines
+- Custom SARIF processing
+
+**Arguments:**
+
+| Argument | Description | Default |
+|----------|-------------|--------|
+| `--repo` | Path to repository (required) | - |
+| `--sarif` | Path to SARIF file (required) | - |
+| `--max-findings` | Maximum findings to analyze | `10` |
+| `--no-exploits` | Skip exploit generation | `false` |
+| `--no-patches` | Skip patch generation | `false` |
+| `--out` | Output directory | `out/analyze_<timestamp>` |
+
+**Example:**
+
+```bash
+python3 raptor.py analyze \
+  --repo ./my-app \
+  --sarif ./previous-scan.sarif \
+  --max-findings 20
+```
+
+## Output Structure
+
+All results are saved to the `out/` directory:
+
+```
+out/scan_<repo>_<timestamp>/
+├── semgrep_*.sarif              # Semgrep findings (SARIF format)
+├── codeql_*.sarif               # CodeQL findings (if enabled)
+├── scan_metrics.json            # Statistics and metrics
+├── autonomous_analysis_report.json  # LLM analysis results
+├── exploits/                    # Generated PoC code
+│   ├── exploit_001.py
+│   ├── exploit_002.c
+│   └── exploit_003.js
+└── patches/                     # Secure fixes
+    ├── patch_001.diff
+    ├── patch_002.diff
+    └── patch_003.diff
+```
+
+### File Descriptions
+
+<AccordionGroup>
+  <Accordion title="SARIF Files" icon="file-code">
+    Standard SARIF 2.1.0 format containing:
+    - Vulnerability locations (file, line, column)
+    - Severity ratings
+    - Rule metadata and descriptions
+    - Dataflow paths (for CodeQL findings)
+    
+    Compatible with GitHub Code Scanning, Azure DevOps, and other SARIF consumers.
+  </Accordion>
+  <Accordion title="scan_metrics.json" icon="chart-simple">
+    Scan statistics including:
+    - Total findings by severity
+    - Scan duration
+    - Files scanned
+    - Languages detected
+    - Tool versions
+  </Accordion>
+  <Accordion title="autonomous_analysis_report.json" icon="robot">
+    LLM analysis results:
+    - Exploitability assessments
+    - False positive detection
+    - Attack scenarios
+    - CVSS scores
+    - Prioritization recommendations
+  </Accordion>
+  <Accordion title="exploits/" icon="bug">
+    Generated proof-of-concept code:
+    - Python, C, C++, JavaScript, or language-appropriate
+    - Fully compilable and executable
+    - Includes usage instructions
+    - Safe for authorized testing only
+  </Accordion>
+  <Accordion title="patches/" icon="bandage">
+    Secure fixes in unified diff format:
+    - Production-ready code changes
+    - Includes explanatory comments
+    - Testing recommendations
+    - OWASP/CWE references
+  </Accordion>
+</AccordionGroup>
+
+## Policy Groups
+
+Semgrep policy groups define which rules to run:
+
+| Group | Description | Example Rules |
+|-------|-------------|---------------|
+| `secrets` | Hardcoded credentials, API keys | AWS keys, passwords, tokens |
+| `owasp` | OWASP Top 10 vulnerabilities | SQLi, XSS, injection flaws |
+| `security_audit` | General security issues | Weak crypto, insecure defaults |
+| `crypto` | Cryptographic weaknesses | MD5, weak keys, bad algorithms |
+| `all` | All available policy groups | Everything |
+
+**Usage:**
+
+```bash
+# Single group
+python3 raptor.py scan --repo ./app --policy-groups secrets
+
+# Multiple groups
+python3 raptor.py scan --repo ./app --policy-groups crypto,secrets,owasp
+
+# All groups (default)
+python3 raptor.py scan --repo ./app --policy-groups all
+```
+
+<Tip>
+Custom policy groups can be added in `packages/static-analysis/scanner.py`.
+</Tip>
+
+## Environment Variables
+
+Configure RAPTOR behavior via environment variables:
+
+### LLM Provider Configuration
+
+```bash
+# Anthropic (recommended)
+export ANTHROPIC_API_KEY="sk-ant-..."
+export LLM_PROVIDER="anthropic"
+
+# OpenAI (alternative)
+export OPENAI_API_KEY="sk-..."
+export LLM_PROVIDER="openai"
+
+# Local Ollama (for air-gapped environments)
+export LLM_PROVIDER="local"
+export OLLAMA_HOST="http://localhost:11434"
+```
+
+<Info>
+RAPTOR automatically falls back: Claude → GPT-4 → Ollama if a provider fails.
+</Info>
+
+### Path Configuration
+
+```bash
+# RAPTOR installation directory
+export RAPTOR_ROOT="/path/to/raptor"
+
+# Custom output directory
+export RAPTOR_OUT_DIR="/custom/output/path"
+
+# CodeQL CLI path (if not in PATH)
+export CODEQL_CLI="/path/to/codeql"
+```
+
+### Debugging
+
+```bash
+# Enable debug logging
+export RAPTOR_LOG_LEVEL="DEBUG"
+
+# Disable LLM analysis (scan only)
+export RAPTOR_NO_LLM="true"
+```
+
+## CI/CD Integration
+
+Integrate RAPTOR into your continuous integration pipelines:
+
+### GitHub Actions
+
+```yaml
+name: Security Scan
+on: [push, pull_request]
+
+jobs:
+  raptor-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install RAPTOR
+        run: |
+          git clone https://github.com/gadievron/raptor
+          cd raptor
+          pip install -r requirements.txt
+          pip install semgrep
+      
+      - name: Run Security Scan
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python3 raptor/raptor.py agentic \
+            --repo . \
+            --policy-groups owasp,secrets \
+            --max-findings 5 \
+            --mode fast \
+            --no-exploits
+      
+      - name: Upload Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-results
+          path: out/
+      
+      - name: Check for Critical Findings
+        run: |
+          if grep -q '"severity": "error"' out/*/autonomous_analysis_report.json; then
+            echo "Critical vulnerabilities found!"
+            exit 1
+          fi
+```
+
+### GitLab CI
+
+```yaml
+security_scan:
+  image: python:3.11
+  stage: test
+  script:
+    - git clone https://github.com/gadievron/raptor
+    - cd raptor
+    - pip install -r requirements.txt
+    - pip install semgrep
+    - |
+      python3 raptor.py agentic \
+        --repo $CI_PROJECT_DIR \
+        --policy-groups owasp,secrets \
+        --max-findings 5 \
+        --mode fast \
+        --no-exploits
+  artifacts:
+    paths:
+      - out/
+    reports:
+      sast: out/*/semgrep_*.sarif
+  variables:
+    ANTHROPIC_API_KEY: $ANTHROPIC_API_KEY
+```
+
+### Jenkins Pipeline
+
+```groovy
+pipeline {
+    agent any
+    
+    environment {
+        ANTHROPIC_API_KEY = credentials('anthropic-api-key')
+    }
+    
+    stages {
+        stage('Security Scan') {
+            steps {
+                sh '''
+                    python3 raptor/raptor.py agentic \
+                        --repo . \
+                        --policy-groups owasp,secrets \
+                        --max-findings 5 \
+                        --mode fast \
+                        --no-exploits
+                '''
+            }
+        }
+        
+        stage('Archive Results') {
+            steps {
+                archiveArtifacts artifacts: 'out/**/*', fingerprint: true
+                publishHTML([
+                    reportDir: 'out',
+                    reportFiles: '*/autonomous_analysis_report.json',
+                    reportName: 'Security Scan Results'
+                ])
+            }
+        }
+    }
+}
+```
+
+### Fast Mode for Pipelines
+
+Use `--mode fast` to optimize for CI/CD:
+
+```bash
+python3 raptor.py agentic \
+  --repo . \
+  --policy-groups owasp,secrets \
+  --max-findings 5 \
+  --mode fast \
+  --no-exploits
+```
+
+**Fast mode differences:**
+- Fewer findings processed (default 5 vs 10)
+- Skips exploit generation (faster, less LLM usage)
+- Focuses on high-severity issues only
+- Optimized for quick feedback
+
+### Exit Codes
+
+```bash
+# Exit code 0: No critical findings
+# Exit code 1: Critical findings detected or error occurred
+
+if python3 raptor.py agentic --repo . --mode fast; then
+    echo "Security scan passed"
+else
+    echo "Security scan failed - review findings"
+    exit 1
+fi
+```
+
+## Scripting Examples
+
+### Batch Processing Multiple Repositories
+
+```bash
+#!/bin/bash
+
+# Scan multiple repositories
+repos=(
+    "/path/to/repo1"
+    "/path/to/repo2"
+    "/path/to/repo3"
+)
+
+for repo in "${repos[@]}"; do
+    echo "Scanning $repo..."
+    python3 raptor.py agentic \
+        --repo "$repo" \
+        --max-findings 10 \
+        --out "./results/$(basename $repo)"
+done
+
+echo "All scans complete!"
+```
+
+### Scheduled Security Scans
+
+```bash
+#!/bin/bash
+# Add to crontab: 0 2 * * * /path/to/nightly-scan.sh
+
+DATE=$(date +%Y-%m-%d)
+REPO="/path/to/app"
+OUT="/security-results/$DATE"
+
+python3 raptor.py agentic \
+    --repo "$REPO" \
+    --max-findings 20 \
+    --out "$OUT"
+
+# Send notification if critical findings
+if grep -q '"severity": "error"' "$OUT/"*/autonomous_analysis_report.json; then
+    echo "Critical vulnerabilities found in nightly scan" | \
+        mail -s "Security Alert" security-team@company.com
+fi
+```
+
+### Compare Before/After Patches
+
+```bash
+#!/bin/bash
+
+# Scan before patches
+python3 raptor.py scan --repo ./app --out ./results/before
+
+# Apply patches
+git apply patches/*.diff
+
+# Scan after patches
+python3 raptor.py scan --repo ./app --out ./results/after
+
+# Compare results
+echo "Before: $(jq '.runs[0].results | length' ./results/before/*.sarif)"
+echo "After: $(jq '.runs[0].results | length' ./results/after/*.sarif)"
+```
+
+### Parse and Filter Results
+
+```bash
+#!/bin/bash
+
+# Extract only HIGH and CRITICAL findings
+jq '.runs[0].results[] | select(.level == "error" or .level == "warning")' \
+    out/scan_*/semgrep_*.sarif > critical-findings.json
+
+# Count findings by severity
+echo "Critical: $(jq '[.runs[0].results[] | select(.level == "error")] | length' out/scan_*/*.sarif)"
+echo "High: $(jq '[.runs[0].results[] | select(.level == "warning")] | length' out/scan_*/*.sarif)"
+
+# Extract findings by CWE
+jq '.runs[0].results[] | select(.ruleId | contains("CWE-89"))' \
+    out/scan_*/*.sarif > sqli-findings.json
+```
+
+## Advanced Usage
+
+### Custom Build Commands
+
+For compiled languages, specify build commands:
+
+```bash
+# Java with Maven
+python3 raptor.py codeql \
+    --repo ./java-app \
+    --languages java \
+    --build-command "mvn clean compile -DskipTests"
+
+# C++ with CMake
+python3 raptor.py codeql \
+    --repo ./cpp-app \
+    --languages cpp \
+    --build-command "cmake . && make"
+
+# C# with dotnet
+python3 raptor.py codeql \
+    --repo ./dotnet-app \
+    --languages csharp \
+    --build-command "dotnet build --no-restore"
+```
+
+### Focus on Specific Vulnerability Types
+
+```bash
+# Focus on command injection
+python3 raptor.py agentic \
+    --repo ./app \
+    --vuln-type command_injection
+
+# Focus on SQL injection
+python3 raptor.py agentic \
+    --repo ./app \
+    --vuln-type sql_injection
+```
+
+### Binary Mitigation Analysis
+
+```bash
+# Check binary mitigations before fuzzing
+python3 raptor.py agentic \
+    --repo ./source \
+    --binary ./compiled-binary \
+    --check-mitigations
+```
+
+## Troubleshooting
+
+### Command Not Found
+
+```bash
+# Check Python version
+python3 --version
+
+# Verify raptor.py exists
+ls -la raptor.py
+
+# Run with full path
+python3 /full/path/to/raptor.py --help
+```
+
+### Permission Denied
+
+```bash
+# Make script executable
+chmod +x raptor.py
+
+# Or run with python3 explicitly
+python3 raptor.py scan --repo ./app
+```
+
+### Module Import Errors
+
+```bash
+# Install missing dependencies
+pip install -r requirements.txt
+
+# Check PYTHONPATH
+export PYTHONPATH="$PYTHONPATH:/path/to/raptor"
+```
+
+### Semgrep Not Found
+
+```bash
+# Install Semgrep
+pip install semgrep
+
+# Verify installation
+semgrep --version
+```
+
+### CodeQL Not Found
+
+```bash
+# Specify CodeQL path explicitly
+python3 raptor.py codeql \
+    --repo ./app \
+    --codeql-cli /path/to/codeql/codeql
+
+# Or add to PATH
+export PATH="$PATH:/path/to/codeql"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Claude Code Usage" icon="comments" href="/guides/claude-code-usage">
+    Learn interactive security testing with Claude Code
+  </Card>
+  <Card title="Extending RAPTOR" icon="code-branch" href="/guides/extending-raptor">
+    Add custom security scanners and capabilities
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/reference/configuration">
+    Configure RAPTOR for your environment
+  </Card>
+  <Card title="API Reference" icon="book" href="/reference/api">
+    Python API documentation
+  </Card>
+</CardGroup>

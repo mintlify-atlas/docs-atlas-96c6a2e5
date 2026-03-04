@@ -1,0 +1,475 @@
+---
+title: 'Secure Patch Generation'
+description: 'LLM-powered patch generation following security best practices'
+icon: 'shield-check'
+---
+
+## Overview
+
+RAPTOR generates production-ready security patches using LLM analysis combined with secure coding best practices. The system follows OWASP and CWE guidance to ensure comprehensive, maintainable fixes.
+
+<Note>
+Patches are generated using a **senior security engineer persona** - focusing on defense-in-depth and production readiness, not just quick fixes.
+</Note>
+
+## Patch Creation Principles
+
+### 1. Security First
+
+<Steps>
+  <Step title="Fix Completely">
+    Address the root cause, not just symptoms
+    
+    <Warning>
+    **Bad Patch:** Add bounds check to one vulnerable call
+    
+    **Good Patch:** Refactor to use safe API throughout
+    </Warning>
+  </Step>
+  
+  <Step title="Defense in Depth">
+    Apply multiple layers of protection
+    
+    - Input validation
+    - Output sanitization
+    - Secure API usage
+    - Least privilege
+  </Step>
+  
+  <Step title="No New Vulnerabilities">
+    Ensure the fix doesn't introduce new issues
+    
+    - Verify no integer overflows in new bounds checks
+    - Check for NULL pointer dereferences
+    - Avoid creating race conditions
+  </Step>
+</Steps>
+
+### 2. Production Ready
+
+<Check>Maintain existing functionality</Check>
+<Check>Preserve performance characteristics</Check>
+<Check>Keep code readable and maintainable</Check>
+<Check>Include clear explanatory comments</Check>
+
+### 3. Best Practices
+
+- Follow OWASP secure coding guidelines
+- Reference relevant CWE entries
+- Use framework-provided security functions
+- Validate all inputs, sanitize all outputs
+
+## Patch Generation Workflow
+
+The LLM follows this process:
+
+```python
+def generate_patch(self, vuln: VulnerabilityContext) -> bool:
+    """Generate secure patch for vulnerability."""
+    
+    # Read full file for context
+    file_path = vuln.get_full_file_path()
+    with open(file_path) as f:
+        full_file_content = f.read()
+    
+    prompt = f"""
+    You are a senior software security engineer creating a secure patch.
+    
+    Vulnerability:
+    - Type: {vuln.rule_id}
+    - File: {vuln.file_path}:{vuln.start_line}
+    - Description: {vuln.message}
+    
+    Analysis:
+    {json.dumps(vuln.analysis, indent=2)}
+    
+    Vulnerable Code:
+    {vuln.full_code}
+    
+    Full File Content:
+    {full_file_content[:5000]}
+    
+    Create a SECURE PATCH that:
+    1. Completely fixes the vulnerability
+    2. Preserves all existing functionality
+    3. Follows the code's existing style and patterns
+    4. Includes clear comments explaining the fix
+    5. Adds input validation/sanitization where needed
+    6. Uses modern security best practices
+    
+    Provide:
+    1. The complete fixed code
+    2. Clear explanation of what changed and why
+    3. Testing recommendations
+    """
+    
+    response = self.llm.generate(
+        prompt=prompt,
+        temperature=0.3  # Lower temperature for safer patches
+    )
+    
+    # Save patch with metadata...
+```
+
+## Patch Strategies by Vulnerability Type
+
+### SQL Injection
+
+<CodeGroup>
+```python Bad (Vulnerable)
+query = f"SELECT * FROM users WHERE id = {user_id}"
+cursor.execute(query)
+```
+
+```python Good (Patched)
+# Fixed: Use parameterized query to prevent SQL injection (CWE-89)
+query = "SELECT * FROM users WHERE id = ?"
+cursor.execute(query, (user_id,))
+```
+</CodeGroup>
+
+**Principle:** Use parameterized queries, never string concatenation
+
+**References:**
+- OWASP: SQL Injection Prevention Cheat Sheet
+- CWE-89: SQL Injection
+
+### Cross-Site Scripting (XSS)
+
+<CodeGroup>
+```python Bad (Vulnerable)
+return f"<div>Hello {username}</div>"
+```
+
+```python Good (Patched)
+# Fixed: HTML-encode user input to prevent XSS (CWE-79)
+from html import escape
+return f"<div>Hello {escape(username)}</div>"
+```
+</CodeGroup>
+
+**Principle:** HTML-encode all user input in output
+
+**Context-Specific Encoding:**
+- HTML context: `html.escape()`
+- JavaScript context: JSON encode + HTML escape
+- URL context: URL encode
+- CSS context: CSS escape
+
+### Command Injection
+
+<CodeGroup>
+```python Bad (Vulnerable)
+os.system(f"convert {filename} output.pdf")
+```
+
+```python Good (Patched)
+# Fixed: Use subprocess with argument list to prevent command injection (CWE-78)
+import subprocess
+subprocess.run(["convert", filename, "output.pdf"], check=True)
+```
+</CodeGroup>
+
+**Principle:** Use subprocess with argument lists, never `shell=True`
+
+**Additional Defense:**
+```python
+# Also validate filename
+import re
+if not re.match(r'^[a-zA-Z0-9_.-]+$', filename):
+    raise ValueError("Invalid filename")
+```
+
+### Path Traversal
+
+<CodeGroup>
+```python Bad (Vulnerable)
+file_path = os.path.join(upload_dir, filename)
+with open(file_path, 'r') as f:
+    return f.read()
+```
+
+```python Good (Patched)
+# Fixed: Canonicalize and validate path to prevent traversal (CWE-22)
+from pathlib import Path
+
+safe_path = (Path(upload_dir) / filename).resolve()
+if not safe_path.is_relative_to(upload_dir):
+    raise ValueError("Path traversal detected")
+
+with open(safe_path, 'r') as f:
+    return f.read()
+```
+</CodeGroup>
+
+**Principle:** Canonicalize paths and validate they stay within allowed directory
+
+### Buffer Overflow
+
+<CodeGroup>
+```c Bad (Vulnerable)
+void process(char *input) {
+    char buffer[64];
+    strcpy(buffer, input);  // No bounds checking
+    printf("%s\n", buffer);
+}
+```
+
+```c Good (Patched)
+// Fixed: Use bounded string copy to prevent overflow (CWE-120)
+void process(const char *input) {
+    char buffer[64];
+    
+    // Use strncpy with explicit null termination
+    strncpy(buffer, input, sizeof(buffer) - 1);
+    buffer[sizeof(buffer) - 1] = '\0';
+    
+    printf("%s\n", buffer);
+}
+```
+</CodeGroup>
+
+**Better Alternative:**
+```c
+// Even better: Use safer string API
+#include <bsd/string.h>
+
+void process(const char *input) {
+    char buffer[64];
+    
+    // strlcpy guarantees null termination
+    if (strlcpy(buffer, input, sizeof(buffer)) >= sizeof(buffer)) {
+        fprintf(stderr, "Warning: Input truncated\n");
+    }
+    
+    printf("%s\n", buffer);
+}
+```
+
+### Cryptography
+
+<CodeGroup>
+```python Bad (Vulnerable)
+import hashlib
+digest = hashlib.md5(password.encode()).hexdigest()
+```
+
+```python Good (Patched)
+# Fixed: Use appropriate algorithm for password hashing (CWE-916)
+import bcrypt
+
+# Generate salt and hash password
+hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12))
+
+# Verify password
+if bcrypt.checkpw(password.encode(), stored_hash):
+    # Password correct
+```
+</CodeGroup>
+
+**Principle:** Use appropriate algorithms for the use case
+
+| Use Case | Algorithm | Why |
+|----------|-----------|-----|
+| Passwords | bcrypt, Argon2, PBKDF2 | Slow, salted, memory-hard |
+| Data integrity | SHA-256, SHA-3 | Collision-resistant |
+| MACs | HMAC-SHA256 | Keyed, prevents forgery |
+| Encryption | AES-256-GCM | Authenticated encryption |
+
+## Patch Output Format
+
+Patches are saved in markdown format with full context:
+
+```markdown
+# Security Patch for cpp/buffer-overflow
+
+**File:** src/server.c
+**Lines:** 145-150
+**Severity:** high
+
+## Vulnerability Analysis
+
+{
+  "is_exploitable": true,
+  "exploitability_score": 0.85,
+  "cvss_estimate": 8.5,
+  "reasoning": "strcpy with attacker-controlled input..."
+}
+
+## Patch
+
+### Fixed Code
+
+```c
+void handle_request(const char *input) {
+    char buffer[256];
+    
+    // Fixed: Use strncpy with bounds checking (CWE-120)
+    if (strlen(input) >= sizeof(buffer)) {
+        log_error("Input too long");
+        return;
+    }
+    
+    strncpy(buffer, input, sizeof(buffer) - 1);
+    buffer[sizeof(buffer) - 1] = '\0';
+    
+    process_buffer(buffer);
+}
+```
+
+### Explanation
+
+**What Changed:**
+1. Added length check before copy
+2. Used `strncpy` instead of `strcpy`
+3. Explicitly null-terminated buffer
+4. Added error handling for oversized input
+
+**Why:**
+- Original code had no bounds checking - attacker could overflow buffer
+- `strcpy` copies until null byte - arbitrary length
+- Now we validate input length and use bounded copy
+- Explicit null termination prevents unterminated string bugs
+
+**Defense in Depth:**
+- Input validation (length check)
+- Safe API (strncpy instead of strcpy)
+- Explicit termination (prevents partial write bugs)
+- Error logging (aids detection)
+
+### Testing Recommendations
+
+**Unit Tests:**
+```c
+void test_handle_request() {
+    // Test normal input
+    handle_request("normal input");
+    
+    // Test boundary condition
+    char boundary[255];
+    memset(boundary, 'A', 254);
+    boundary[254] = '\0';
+    handle_request(boundary);
+    
+    // Test overflow attempt
+    char overflow[300];
+    memset(overflow, 'A', 299);
+    overflow[299] = '\0';
+    handle_request(overflow);  // Should reject
+}
+```
+
+**Integration Tests:**
+- Send normal requests - verify functionality
+- Send maximum-length inputs - verify acceptance
+- Send oversized inputs - verify rejection
+- Check logs for error messages
+
+**Security Tests:**
+- Fuzz with AFL or libFuzzer
+- Run with AddressSanitizer
+- Verify no regression in existing tests
+
+---
+*Generated by RAPTOR Autonomous Security Agent*
+*Review and test before applying to production*
+```
+
+## Quality Checklist
+
+Before accepting a patch:
+
+<Tabs>
+  <Tab title="Security">
+    <Check>Fixes vulnerability completely</Check>
+    <Check>No new vulnerabilities introduced</Check>
+    <Check>Follows defense-in-depth principles</Check>
+    <Check>References security guidance (OWASP, CWE)</Check>
+    <Check>Uses secure APIs where available</Check>
+  </Tab>
+  
+  <Tab title="Functionality">
+    <Check>Maintains existing behavior</Check>
+    <Check>Handles all code paths</Check>
+    <Check>Includes error handling</Check>
+    <Check>Preserves performance characteristics</Check>
+  </Tab>
+  
+  <Tab title="Code Quality">
+    <Check>Follows project coding style</Check>
+    <Check>Includes explanatory comments</Check>
+    <Check>Uses meaningful variable names</Check>
+    <Check>Avoids over-engineering</Check>
+  </Tab>
+  
+  <Tab title="Testing">
+    <Check>Includes test recommendations</Check>
+    <Check>Covers normal cases</Check>
+    <Check>Covers boundary conditions</Check>
+    <Check>Covers attack scenarios</Check>
+  </Tab>
+</Tabs>
+
+## Deployment Process
+
+<Steps>
+  <Step title="Review Patch">
+    Carefully review the generated patch:
+    
+    - Verify it fixes the root cause
+    - Check for edge cases
+    - Ensure no functionality breakage
+    - Validate security properties
+  </Step>
+  
+  <Step title="Test Thoroughly">
+    Test in development environment. Apply the patch and run all tests including security and fuzz tests to verify the fix works correctly.
+  </Step>
+  
+  <Step title="Security Review">
+    Have security team review:
+    
+    - Does it address the vulnerability?
+    - Are there any bypasses?
+    - Could it introduce new issues?
+  </Step>
+  
+  <Step title="Deploy Safely">
+    Use staged rollout:
+    
+    1. Deploy to staging
+    2. Monitor for errors
+    3. Deploy to 5% of production
+    4. Monitor metrics
+    5. Full production rollout
+  </Step>
+</Steps>
+
+## Best Practices
+
+### Prefer Library Functions
+
+Use well-tested security libraries instead of custom implementations. For example, use bcrypt for password hashing instead of implementing your own with SHA256.
+
+### Validate at Boundaries
+
+Validate inputs at system boundaries before processing them. Check types, ranges, and formats at API entry points.
+
+### Document Security Decisions
+
+Include comments explaining security rationale, especially for non-obvious choices like constant-time comparisons or specific algorithm selections.
+
+### Test Edge Cases
+
+Test boundary conditions including empty input, maximum-length input, NULL pointers, integer overflow conditions, and Unicode edge cases.
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="Vulnerability Analysis" icon="magnifying-glass" href="/analysis/vulnerability-analysis">
+    LLM-powered security analysis
+  </Card>
+  <Card title="Exploit Generation" icon="code" href="/analysis/exploit-generation">
+    Generate exploit PoCs
+  </Card>
+</CardGroup>

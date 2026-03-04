@@ -1,0 +1,299 @@
+---
+title: "/patch"
+description: "Generate secure patches to fix vulnerabilities"
+---
+
+<Warning>
+  This command is in **beta**. Review all patches before applying to production code.
+</Warning>
+
+## Overview
+
+The `/patch` command generates secure patches to fix identified vulnerabilities. It analyzes findings and creates production-ready patch files with fix recommendations.
+
+## Syntax
+
+```bash
+python3 raptor.py agentic --repo <path> --sarif <sarif-file> --no-exploits [options]
+```
+
+## Parameters
+
+<ParamField path="repo" type="string" required>
+  Absolute path to the code repository
+</ParamField>
+
+<ParamField path="sarif" type="string">
+  SARIF file from previous scan (optional if scanning first)
+</ParamField>
+
+<ParamField path="no-exploits" type="boolean">
+  Skip exploit generation (patch generation only)
+</ParamField>
+
+<ParamField path="max-findings" type="integer">
+  Maximum number of patches to generate
+</ParamField>
+
+## What It Does
+
+1. Analyzes vulnerabilities from SARIF findings
+2. Identifies root causes and insecure patterns
+3. Generates secure code replacements
+4. Creates unified diff patch files
+5. Provides fix recommendations and best practices
+6. Saves patches to `out/*/patches/`
+
+## Workflow
+
+### Step 1: Find Vulnerabilities
+
+```bash
+/scan /path/to/code
+```
+
+### Step 2: Generate Patches
+
+```bash
+/patch
+```
+
+### Step 3: Review and Apply
+
+```bash
+# Review the patches
+cat out/*/patches/patch-001.diff
+
+# Apply if satisfied
+git apply out/*/patches/patch-001.diff
+```
+
+## Examples
+
+### Generate Patches for All Findings
+
+```bash
+python3 raptor.py agentic --repo /path/to/code --no-exploits
+```
+
+Generates patches for all discovered vulnerabilities.
+
+### Generate Limited Patches
+
+```bash
+python3 raptor.py agentic --repo /path/to/code --no-exploits --max-findings 5
+```
+
+Generates patches for the first 5 findings.
+
+### From Existing SARIF
+
+```bash
+python3 raptor.py agentic --repo /path/to/code --sarif findings.sarif --no-exploits
+```
+
+Generates patches from previous scan results.
+
+## Patch Types
+
+### SQL Injection Fix
+
+```diff
+--- a/src/auth.py
++++ b/src/auth.py
+@@ -10,7 +10,8 @@
+ def user_login(username, password):
+-    query = f"SELECT * FROM users WHERE name='{username}'"
+-    cursor.execute(query)
++    query = "SELECT * FROM users WHERE name=%s"
++    cursor.execute(query, (username,))
+     return cursor.fetchone()
+```
+
+### Command Injection Fix
+
+```diff
+--- a/src/utils.py
++++ b/src/utils.py
+@@ -5,7 +5,8 @@
++import subprocess
+ def run_command(user_input):
+-    os.system(f"ping {user_input}")
++    subprocess.run(['ping', '-c', '4', user_input], check=True)
+```
+
+### Buffer Overflow Fix
+
+```diff
+--- a/src/handler.c
++++ b/src/handler.c
+@@ -12,7 +12,7 @@
+ void process_input(char *input) {
+     char buffer[64];
+-    strcpy(buffer, input);
++    strncpy(buffer, input, sizeof(buffer) - 1);
++    buffer[sizeof(buffer) - 1] = '\0';
+```
+
+### XSS Fix
+
+```diff
+--- a/templates/profile.html
++++ b/templates/profile.html
+@@ -3,7 +3,7 @@
+ <div class="profile">
+-    <h1>{{ username }}</h1>
++    <h1>{{ username | escape }}</h1>
+</div>
+```
+
+## Patch Quality Features
+
+### Secure Coding Best Practices
+
+- Input validation and sanitization
+- Parameterized queries for SQL
+- Safe API usage (subprocess instead of os.system)
+- Output encoding for XSS prevention
+- Bounds checking for buffer operations
+
+### Defense in Depth
+
+- Multiple layers of protection
+- Fail-safe defaults
+- Principle of least privilege
+- Input validation at trust boundaries
+
+### Code Quality
+
+- Maintains existing code style
+- Minimal changes for maximum security
+- Preserves functionality
+- Includes explanatory comments
+
+## Output Structure
+
+```
+out/agentic_<timestamp>/patches/
+├── patch-001-sqli.diff
+├── patch-002-cmdi.diff
+├── patch-003-xss.diff
+├── patch-004-bof.diff
+├── README.md
+└── recommendations.md
+```
+
+## Patch README Format
+
+```markdown
+# Security Patches
+
+## patch-001-sqli.diff
+
+**Vulnerability**: SQL Injection in user_login()  
+**Severity**: Critical  
+**Location**: src/auth.py:142
+
+### Root Cause
+Unsanitized user input concatenated into SQL query.
+
+### Fix Applied
+Replaced string concatenation with parameterized query.
+
+### Testing Recommendations
+- Test with normal inputs
+- Test with SQL injection payloads
+- Verify error handling
+
+### Apply Command
+```bash
+git apply patches/patch-001-sqli.diff
+```
+```
+
+## Use Cases
+
+- Vulnerability remediation
+- Security hardening
+- Code review assistance
+- Technical debt reduction
+- Compliance requirements
+- Security training
+
+## Safety Features
+
+<Warning>
+  Patches are NOT automatically applied to your code. Always review before applying.
+</Warning>
+
+- Patches are only generated in the output directory
+- No automatic modifications to source code
+- All changes require manual review
+- Unified diff format for easy inspection
+- Includes rationale and testing guidance
+
+## Applying Patches
+
+### Review First
+
+```bash
+# View the patch
+cat out/*/patches/patch-001.diff
+
+# Check what would change
+git apply --check out/*/patches/patch-001.diff
+```
+
+### Apply Safely
+
+```bash
+# Create a branch
+git checkout -b security-fixes
+
+# Apply the patch
+git apply out/*/patches/patch-001.diff
+
+# Review changes
+git diff
+
+# Test thoroughly
+./run-tests.sh
+
+# Commit if satisfied
+git commit -am "Fix SQL injection in user_login()"
+```
+
+## Best Practices
+
+1. **Review Every Patch**: Understand the changes before applying
+2. **Test Thoroughly**: Run full test suite after applying
+3. **Apply Incrementally**: One patch at a time
+4. **Version Control**: Use branches for security fixes
+5. **Peer Review**: Have team members review patches
+6. **Document Changes**: Update security documentation
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="/scan" href="/api/commands/scan">
+    Find vulnerabilities to patch
+  </Card>
+  <Card title="/validate" href="/api/commands/validate">
+    Validate vulnerabilities before patching
+  </Card>
+  <Card title="/exploit" href="/api/commands/exploit">
+    Generate exploits instead of patches
+  </Card>
+  <Card title="/agentic" href="/api/commands/agentic">
+    Full workflow including patch generation
+  </Card>
+</CardGroup>
+
+## Notes
+
+- Does NOT generate exploits (use `/exploit` for that)
+- Patches are saved to `out/*/patches/`
+- Nothing is applied to your code automatically
+- All patches require manual review and testing
+- Maintains code style and functionality
+- For security hardening and compliance

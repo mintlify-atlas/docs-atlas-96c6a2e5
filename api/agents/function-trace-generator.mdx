@@ -1,0 +1,244 @@
+---
+title: Function Trace Generator Agent
+description: Generate function-level execution traces for debugging and analysis
+---
+
+The Function Trace Generator agent creates detailed function-level execution traces for C/C++ programs using compiler instrumentation. These traces are essential for crash analysis and understanding program behavior.
+
+## Purpose
+
+Generate function-level execution traces that show:
+- Function entry and exit events
+- Call stack depth
+- Execution timeline
+- Thread-level information
+
+## Invocation
+
+Invoked by the crash-analysis-agent as part of the crash analysis workflow.
+
+**Receives**:
+- Code repository path
+- Working directory path
+- Crashing example program and build instructions
+
+**Creates**: `traces/` subdirectory in working directory
+
+## Workflow
+
+<Steps>
+  <Step title="Build Instrumentation Library">
+    ```bash
+    cd .claude/skills/crash-analysis/function-tracing/
+    
+    # Build the trace library
+    gcc -c -fPIC trace_instrument.c -o trace_instrument.o
+    gcc -shared trace_instrument.o -o libtrace.so -ldl -lpthread
+    
+    # Build Perfetto converter
+    g++ -O3 -std=c++17 trace_to_perfetto.cpp -o trace_to_perfetto
+    ```
+  </Step>
+  
+  <Step title="Rebuild Target with Instrumentation">
+    Add instrumentation flags to the build:
+    
+    - Add `-finstrument-functions -g` to CFLAGS
+    - Add `-L<path-to-libtrace> -ltrace -ldl -lpthread` to LDFLAGS
+    
+    **Autotools**:
+    ```bash
+    ./configure CFLAGS="-finstrument-functions -g" \
+                LDFLAGS="-L/path/to/libtrace -ltrace -ldl -lpthread"
+    ```
+    
+    **CMake**:
+    ```bash
+    cmake -DCMAKE_C_FLAGS="-finstrument-functions -g" \
+          -DCMAKE_EXE_LINKER_FLAGS="-L/path/to/libtrace -ltrace -ldl -lpthread" ..
+    ```
+    
+    **Makefile**:
+    ```bash
+    make CFLAGS="-finstrument-functions -g" \
+         LDFLAGS="-L/path/to/libtrace -ltrace -ldl -lpthread"
+    ```
+  </Step>
+  
+  <Step title="Run Crashing Program">
+    ```bash
+    export LD_LIBRARY_PATH=/path/to/libtrace:$LD_LIBRARY_PATH
+    <crashing-command>
+    # Creates trace_<tid>.log files
+    ```
+  </Step>
+  
+  <Step title="Convert to Perfetto Format (Optional)">
+    ```bash
+    ./trace_to_perfetto trace_*.log -o traces/trace.json
+    # Can be viewed at ui.perfetto.dev
+    ```
+  </Step>
+  
+  <Step title="Move Trace Files">
+    Copy all trace files to the `traces/` subdirectory in working directory
+  </Step>
+</Steps>
+
+## Instrumentation Details
+
+The `-finstrument-functions` flag causes the compiler to insert calls to:
+
+```c
+void __cyg_profile_func_enter(void *this_fn, void *call_site);
+void __cyg_profile_func_exit(void *this_fn, void *call_site);
+```
+
+These are implemented by `libtrace.so` to log:
+- Function address
+- Timestamp (nanosecond precision)
+- Thread ID
+- Entry/exit event type
+
+## Trace File Format
+
+Raw trace files (`trace_<tid>.log`) contain:
+
+```
+[0] [1.000000000]  [ENTRY] main
+[1] [1.000050000] . [ENTRY] some_function
+[2] [1.000100000] .. [ENTRY] helper_function
+[3] [1.000150000] .. [EXIT]  helper_function
+[4] [1.000200000] . [EXIT]  some_function
+[5] [1.000250000]  [EXIT]  main
+```
+
+- **[N]**: Event sequence number
+- **[timestamp]**: Nanoseconds since start
+- **Dots**: Call depth visualization
+- **[ENTRY/EXIT]**: Event type
+- **Function name**: Resolved from debug symbols
+
+## Perfetto Format
+
+The Perfetto JSON format enables visualization at [ui.perfetto.dev](https://ui.perfetto.dev):
+
+```json
+{
+  "traceEvents": [
+    {
+      "name": "main",
+      "cat": "function",
+      "ph": "B",
+      "ts": 1000000000,
+      "pid": 12345,
+      "tid": 12345
+    },
+    {
+      "name": "main",
+      "cat": "function",
+      "ph": "E",
+      "ts": 1000250000,
+      "pid": 12345,
+      "tid": 12345
+    }
+  ]
+}
+```
+
+## Validation
+
+After generating traces, validate:
+
+<Checklist>
+  - [ ] At least one `trace_*.log` file created
+  - [ ] File contains function entry/exit events
+  - [ ] Main function or entry point appears in trace
+  - [ ] Trace covers execution up to crash point
+</Checklist>
+
+**Example validation**:
+
+```bash
+# Check trace files exist
+ls traces/trace_*.log
+
+# Check for function events
+head -50 traces/trace_*.log
+
+# Should see lines like:
+# [0] [1.000000000]  [ENTRY] main
+# [1] [1.000050000] . [ENTRY] some_function
+```
+
+## Usage in Crash Analysis
+
+The crash-analyzer-agent uses function traces to:
+
+1. **Verify execution path**: Confirm hypothesized functions were actually called
+2. **Track control flow**: Follow execution from entry to crash
+3. **Identify missing functions**: Detect functions that should have been called but weren't
+4. **Correlate with coverage**: Cross-reference with gcov data
+
+## Performance Impact
+
+<Warning>
+  Function instrumentation adds significant overhead:
+  - 10-100x slowdown typical
+  - Large trace files (MB-GB for complex programs)
+  - Memory overhead for buffering
+</Warning>
+
+**Recommendations**:
+- Use only for crash reproduction, not production
+- Limit trace duration to necessary execution
+- Consider filtering high-frequency functions if needed
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="No trace files generated">
+    - Check `LD_LIBRARY_PATH` includes libtrace.so directory
+    - Verify program actually executed (didn't fail immediately)
+    - Check write permissions in current directory
+  </Accordion>
+
+  <Accordion title="Empty or incomplete traces">
+    - Program may have crashed before trace buffer flushed
+    - Increase buffer size in trace_instrument.c
+    - Add explicit flush before crash-prone code
+  </Accordion>
+
+  <Accordion title="Function names show as addresses">
+    - Missing debug symbols (-g flag)
+    - Stripped binary
+    - Use `addr2line` or `nm` to resolve manually
+  </Accordion>
+
+  <Accordion title="Trace files too large">
+    - Filter out high-frequency functions
+    - Limit tracing to specific code sections
+    - Use sampling instead of full instrumentation
+  </Accordion>
+</AccordionGroup>
+
+## Output Structure
+
+```
+<working-dir>/traces/
+├── trace_12345.log          # Raw trace (thread 12345)
+├── trace_12346.log          # Raw trace (thread 12346)
+└── trace.json               # Perfetto format (all threads)
+```
+
+## Related Agents
+
+<CardGroup cols={2}>
+  <Card title="Crash Analysis" icon="bug" href="/api/agents/crash-analysis">
+    Main crash analysis orchestrator
+  </Card>
+  
+  <Card title="Coverage Analyzer" icon="chart-line" href="/api/agents/coverage-analyzer">
+    Complementary coverage data generation
+  </Card>
+</CardGroup>

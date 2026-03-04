@@ -1,0 +1,771 @@
+---
+title: FAQ
+description: Frequently asked questions about RAPTOR installation, usage, and troubleshooting
+---
+
+## Installation & Setup
+
+<AccordionGroup>
+  <Accordion title="How do I install RAPTOR?">
+    **Two options:**
+    
+    **Option 1: Manual Installation**
+    ```bash
+    # Clone repository
+    git clone https://github.com/gadievron/raptor.git
+    cd raptor
+    
+    # Install dependencies
+    pip install -r requirements.txt
+    pip install semgrep
+    
+    # Set API key
+    export ANTHROPIC_API_KEY="your-key-here"
+    
+    # Start Claude Code
+    claude
+    ```
+    
+    **Option 2: DevContainer (Recommended)**
+    ```bash
+    # Clone and open in VS Code
+    git clone https://github.com/gadievron/raptor.git
+    code raptor
+    
+    # Use: Dev Container: Open Folder in Container
+    # Everything is pre-installed!
+    ```
+    
+    See [Quick Start](/quickstart) for detailed instructions.
+  </Accordion>
+  
+  <Accordion title="What are the system requirements?">
+    **Minimum:**
+    - Python 3.12+
+    - 4GB RAM
+    - 2GB disk space
+    - Claude Code or compatible editor
+    
+    **Recommended (with DevContainer):**
+    - 8GB RAM
+    - 10GB disk space
+    - Docker installed
+    - Linux x86_64 for full features (rr debugger)
+    
+    **Supported Platforms:**
+    - Linux (x86_64) - Full support
+    - macOS (ARM64/Intel) - Partial support (no rr)
+    - Windows (WSL2) - Partial support (no rr)
+  </Accordion>
+  
+  <Accordion title="Why does RAPTOR auto-download tools without asking?">
+    By default, RAPTOR automatically installs missing tools to streamline usage. This happens when:
+    - A command requires a tool that isn't installed
+    - RAPTOR detects missing dependencies
+    
+    **To control installations:**
+    1. Use the devcontainer (all tools pre-installed)
+    2. Pre-install tools manually (see [Dependencies](/resources/dependencies))
+    3. Review DEPENDENCIES.md before first use
+    
+    <Warning>
+      This behavior is documented in README.md as: "Be warned: Unless you use the devcontainer, RAPTOR will automatically install tools without asking."
+    </Warning>
+  </Accordion>
+  
+  <Accordion title="Do I need to install Semgrep and CodeQL manually?">
+    **Manual installation:** Yes, unless using devcontainer.
+    
+    ```bash
+    # Semgrep (required)
+    pip install semgrep
+    
+    # CodeQL (optional)
+    curl -L "https://github.com/github/codeql-cli-binaries/releases/download/v2.15.5/codeql-linux64.zip" -o codeql.zip
+    unzip codeql.zip -d /opt
+    export PATH="/opt/codeql:$PATH"
+    ```
+    
+    **DevContainer:** All tools pre-installed automatically.
+    
+    See [Dependencies](/resources/dependencies) for complete tool list.
+  </Accordion>
+  
+  <Accordion title="Can I use RAPTOR without Claude Code?">
+    Yes! RAPTOR has a Python CLI for scripting and CI/CD:
+    
+    ```bash
+    # Scan code
+    python3 raptor.py scan --repo /path/to/code
+    
+    # Full autonomous workflow
+    python3 raptor.py agentic --repo /path/to/code
+    
+    # Fuzz binary
+    python3 raptor.py fuzz --binary /path/to/target
+    ```
+    
+    However, the interactive Claude Code experience provides better context and decision-making.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## LLM Provider Setup
+
+<AccordionGroup>
+  <Accordion title="Which LLM providers does RAPTOR support?">
+    RAPTOR uses LiteLLM for unified LLM integration:
+    
+    **Supported providers:**
+    - Anthropic Claude (recommended)
+    - OpenAI GPT-4
+    - Google Gemini
+    - Ollama (local models)
+    
+    **Configuration:**
+    ```bash
+    # Anthropic (recommended)
+    export ANTHROPIC_API_KEY="sk-ant-..."
+    
+    # OpenAI
+    export OPENAI_API_KEY="sk-..."
+    
+    # Ollama (local)
+    export OLLAMA_HOST="http://localhost:11434"
+    ```
+    
+    See [LLM Configuration](/core-concepts/llm-configuration) for details.
+  </Accordion>
+  
+  <Accordion title="Can I use local models with Ollama?">
+    Yes! RAPTOR supports Ollama for local inference:
+    
+    **Setup:**
+    ```bash
+    # Install Ollama
+    curl -fsSL https://ollama.ai/install.sh | sh
+    
+    # Pull a model
+    ollama pull llama3.1:70b
+    
+    # Configure RAPTOR
+    export OLLAMA_HOST="http://localhost:11434"
+    ```
+    
+    **Performance note:** Local models work for analysis but may produce lower-quality exploit code compared to frontier models (Claude, GPT-4).
+    
+    **Experimental benchmark:**
+    | Provider | Exploit Quality | Cost |
+    |----------|----------------|------|
+    | Claude/GPT-4 | ✅ Compilable | ~$0.03/vuln |
+    | Ollama | ❌ Often broken | FREE |
+  </Accordion>
+  
+  <Accordion title="How do I use a remote Ollama server?">
+    Configure `OLLAMA_HOST` to point to your remote server:
+    
+    ```bash
+    # Remote server
+    export OLLAMA_HOST="https://ollama.example.com:11434"
+    
+    # Or custom port
+    export OLLAMA_HOST="http://192.168.1.100:8080"
+    ```
+    
+    **Performance tuning:** Remote Ollama automatically uses longer retry delays (5s vs 2s for local) to account for network latency.
+    
+    <Warning>
+      Never disclose remote Ollama server locations in code, comments, or logs (per CLAUDE.md guidelines).
+    </Warning>
+  </Accordion>
+  
+  <Accordion title="How do I configure multiple LLM providers with fallback?">
+    Use LiteLLM YAML configuration:
+    
+    ```yaml litellm_config.yaml
+    model_list:
+      - model_name: claude-opus-4.5
+        litellm_params:
+          model: anthropic/claude-opus-4.5
+          api_key: ${ANTHROPIC_API_KEY}
+      - model_name: gpt-5.2-thinking
+        litellm_params:
+          model: openai/gpt-5.2-thinking
+          api_key: ${OPENAI_API_KEY}
+      - model_name: local-fallback
+        litellm_params:
+          model: ollama/llama3.1:70b
+          api_base: http://localhost:11434
+    ```
+    
+    ```bash
+    export LITELLM_CONFIG_PATH="./litellm_config.yaml"
+    ```
+    
+    See [LLM Configuration](/core-concepts/llm-configuration) for complete guide.
+  </Accordion>
+  
+  <Accordion title="What if I hit API rate limits?">
+    RAPTOR includes intelligent quota detection:
+    
+    **Rate limit handling:**
+    1. RAPTOR detects rate limits automatically
+    2. Provides provider-specific guidance:
+       - Anthropic: Wait time, check usage dashboard
+       - OpenAI: Retry with exponential backoff
+       - Others: Generic retry advice
+    3. Suggests fallback providers if configured
+    
+    **Budget enforcement:**
+    ```python
+    from packages.llm_analysis.llm.config import LLMConfig
+    
+    config = LLMConfig(
+        max_cost_per_scan=1.0  # Prevent exceeding $1
+    )
+    ```
+    
+    See [Cost Management](/core-concepts/cost-management) for details.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Cost Management
+
+<AccordionGroup>
+  <Accordion title="How much does RAPTOR cost to run?">
+    **Depends on LLM provider and scan size:**
+    
+    **Typical costs (Claude/GPT-4):**
+    - Quick scan (no exploits): ~$0.10-0.30
+    - Full agentic (with exploits): ~$0.50-2.00
+    - Per vulnerability exploit: ~$0.03
+    
+    **Free options:**
+    - Ollama (local inference): FREE
+    - Scan-only mode (no LLM): FREE
+    
+    **Cost tracking:**
+    RAPTOR logs costs for every LLM call:
+    ```
+    [LLM] model=claude-opus-4.5 tokens=1523 cost=$0.023 duration=2.3s
+    ```
+  </Accordion>
+  
+  <Accordion title="How do I set a budget limit?">
+    Use LiteLLM's budget enforcement:
+    
+    ```python
+    from packages.llm_analysis.llm.config import LLMConfig
+    
+    config = LLMConfig(
+        max_cost_per_scan=5.0  # Stop if exceeding $5
+    )
+    ```
+    
+    **Budget exceeded error:**
+    ```
+    BudgetExceededError: Cost $5.23 exceeds max $5.00
+    Current costs: {
+      "claude-opus-4.5": $3.45,
+      "gpt-5.2-thinking": $1.78
+    }
+    ```
+    
+    RAPTOR will stop immediately when budget is exceeded.
+  </Accordion>
+  
+  <Accordion title="How do I reduce costs?">
+    **Cost optimization strategies:**
+    
+    1. **Use scan-only mode** (no LLM, free):
+    ```bash
+    python3 raptor.py scan --repo /path/to/code
+    ```
+    
+    2. **Skip exploit generation**:
+    ```bash
+    python3 raptor.py agentic --repo /path/to/code --skip-exploits
+    ```
+    
+    3. **Use local models**:
+    ```bash
+    export OLLAMA_HOST="http://localhost:11434"
+    # Free, but lower exploit quality
+    ```
+    
+    4. **Analyze only high-priority findings**:
+    Use adversarial thinking to focus on secrets and high-impact vulnerabilities first.
+    
+    5. **Set budget limits** (see above)
+  </Accordion>
+  
+  <Accordion title="Does RAPTOR track costs in real-time?">
+    Yes! RAPTOR uses LiteLLM callbacks for real-time cost tracking:
+    
+    **Per-request logging:**
+    ```
+    [LLM] Starting request to model=claude-opus-4.5
+    [LLM] Success: tokens=1523 (prompt=450 completion=1073) cost=$0.023 duration=2.3s
+    ```
+    
+    **Budget warnings:**
+    ```
+    [WARNING] Approaching budget limit: $4.50 of $5.00 used (90%)
+    ```
+    
+    **Cost summary at end:**
+    ```
+    Total LLM costs: $3.45
+    - claude-opus-4.5: $2.10 (12 calls)
+    - gpt-5.2-thinking: $1.35 (5 calls)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Exploit Generation Quality
+
+<AccordionGroup>
+  <Accordion title="Why are my generated exploits not compiling?">
+    **Common causes:**
+    
+    1. **Local models:** Ollama models often produce non-compilable code. Use Claude or GPT-4 for exploits.
+    
+    2. **Missing context:** Ensure RAPTOR has full codebase context (not just snippets).
+    
+    3. **Complex vulnerabilities:** Some exploits require manual refinement.
+    
+    **Solutions:**
+    - Use frontier models (Claude Opus, GPT-4)
+    - Enable exploit feasibility analysis:
+    ```python
+    from packages.exploit_feasibility.api import analyze_binary
+    result = analyze_binary('/path/to/binary')
+    print(result['exploitation_paths'])
+    ```
+    - Review and manually fix generated code
+  </Accordion>
+  
+  <Accordion title="How accurate is exploit feasibility analysis?">
+    RAPTOR's exploit feasibility analysis checks:
+    
+    ✅ **Accurate checks:**
+    - Empirical %n verification (tests actual glibc)
+    - Null byte constraints from strcpy
+    - ROP gadget quality (counts usable gadgets)
+    - Input handler bad bytes
+    - Full RELRO blocks .fini_array
+    
+    ❌ **What it doesn't replace:**
+    - Manual exploitation expertise
+    - Runtime behavior analysis
+    - Complex heap exploitation
+    
+    **Verdict meanings:**
+    - **Likely exploitable:** Good primitives, high confidence
+    - **Difficult:** Primitives exist but hard to chain
+    - **Unlikely:** No known path, suggest environment changes
+    
+    See [Exploit Guidance](/core-concepts/exploit-development) for details.
+  </Accordion>
+  
+  <Accordion title="What should I do if exploit generation says 'Unlikely'?">
+    The exploit feasibility analysis provides next steps:
+    
+    **Example output:**
+    ```
+    Verdict: Unlikely exploitable
+    
+    Chain breaks:
+    - No writable function pointers (Full RELRO)
+    - %n format blocked by glibc 2.35
+    - 0 usable ROP gadgets
+    
+    What would help:
+    - Run in older environment (Docker with glibc 2.31)
+    - Find alternative targets (heap, stack)
+    - Focus on information leak only
+    ```
+    
+    **Options:**
+    1. Try suggested mitigations (older environment)
+    2. Focus on other vulnerabilities
+    3. Use as information leak only
+    4. Move on to other targets
+    
+    <Info>
+      RAPTOR always offers next steps, even for "Unlikely" verdicts. Let the user decide how to proceed.
+    </Info>
+  </Accordion>
+  
+  <Accordion title="Can RAPTOR generate ROP chains?">
+    RAPTOR checks ROP feasibility but doesn't auto-generate full chains:
+    
+    **What RAPTOR does:**
+    - Counts usable ROP gadgets
+    - Checks for bad bytes in gadgets
+    - Verifies gadget availability
+    - Suggests ROP as technique
+    
+    **What RAPTOR doesn't do:**
+    - Auto-generate full ROP chains (too complex)
+    - Guarantee chain success
+    
+    **Manual ROP:**
+    Use tools like ROPgadget or ropper after RAPTOR analysis:
+    ```bash
+    ROPgadget --binary target
+    ropper --file target
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Tool Compatibility
+
+<AccordionGroup>
+  <Accordion title="Does RAPTOR work with GitHub Copilot / Cursor / Windsurf?">
+    **Current status:** RAPTOR is designed for Claude Code.
+    
+    **Community ports:** We welcome contributions to port RAPTOR to:
+    - GitHub Copilot
+    - Cursor
+    - Windsurf
+    - Cline
+    - Devin
+    
+    See [Contributing](/resources/contributing) to help with ports.
+  </Accordion>
+  
+  <Accordion title="Can I use RAPTOR in CI/CD pipelines?">
+    Yes! Use the Python CLI:
+    
+    ```yaml GitHub Actions Example
+    name: RAPTOR Security Scan
+    on: [push, pull_request]
+    
+    jobs:
+      security-scan:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v3
+          - name: Install dependencies
+            run: |
+              pip install -r requirements.txt
+              pip install semgrep
+          - name: Run RAPTOR scan
+            env:
+              ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+            run: |
+              python3 raptor.py scan --repo . --policy_groups secrets,security
+          - name: Upload results
+            uses: actions/upload-artifact@v3
+            with:
+              name: raptor-results
+              path: out/
+    ```
+  </Accordion>
+  
+  <Accordion title="Does CodeQL require a license for commercial use?">
+    **Yes!** CodeQL has important licensing restrictions:
+    
+    <Warning>
+      **CodeQL License:** GitHub CodeQL Terms allow free use for:
+      - Security research
+      - Open source projects
+      
+      **NOT allowed:**
+      - Commercial use
+      - Closed-source commercial products
+    </Warning>
+    
+    **Alternatives for commercial use:**
+    1. Use Semgrep only (LGPL 2.1)
+    2. Contact GitHub for CodeQL commercial license
+    3. Use other SAST tools
+    
+    See [Dependencies](/resources/dependencies) for complete license information.
+  </Accordion>
+  
+  <Accordion title="Can I use RAPTOR offline / air-gapped?">
+    **Partial support:**
+    
+    **Works offline:**
+    - Static analysis (Semgrep, CodeQL)
+    - Binary fuzzing (AFL++)
+    - Local Ollama models
+    
+    **Requires internet:**
+    - Cloud LLM providers (Claude, GPT-4)
+    - Tool downloads (if not pre-installed)
+    - OSS forensics (GitHub API, BigQuery)
+    
+    **Offline setup:**
+    1. Use devcontainer (all tools pre-installed)
+    2. Install Ollama with local models
+    3. Pre-download all dependencies
+    4. Run in air-gapped environment
+  </Accordion>
+  
+  <Accordion title="Is RAPTOR compatible with Windows?">
+    **Via WSL2:** Yes, with limitations.
+    
+    **Setup:**
+    ```powershell
+    # Install WSL2
+    wsl --install
+    
+    # Inside WSL2
+    git clone https://github.com/gadievron/raptor.git
+    cd raptor
+    # Follow Linux installation instructions
+    ```
+    
+    **Limitations:**
+    - No rr debugger (Linux x86_64 only)
+    - Some performance overhead
+    - Docker Desktop required for devcontainer
+    
+    **Recommended:** Use Linux (native or VM) for full features.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="RAPTOR says 'Semgrep not found'">
+    **Solution:**
+    
+    ```bash
+    # Install Semgrep
+    pip install semgrep
+    
+    # Verify
+    semgrep --version
+    ```
+    
+    If using devcontainer, rebuild:
+    ```bash
+    # In VS Code
+    Dev Container: Rebuild Container
+    ```
+  </Accordion>
+  
+  <Accordion title="CodeQL database creation fails">
+    **Common causes:**
+    
+    1. **CodeQL not in PATH:**
+    ```bash
+    export PATH="/opt/codeql:$PATH"
+    codeql version
+    ```
+    
+    2. **Language not detected:**
+    ```bash
+    # Manually specify language
+    python3 raptor.py codeql --repo /path --language python
+    ```
+    
+    3. **Build required (C/C++):**
+    Ensure project can compile:
+    ```bash
+    make clean && make
+    ```
+  </Accordion>
+  
+  <Accordion title="LLM returns JSON parsing errors">
+    **Causes:**
+    - Model output truncated
+    - Network timeout
+    - Ollama slow response
+    
+    **Solutions:**
+    
+    1. **Retry:** RAPTOR auto-retries with exponential backoff
+    
+    2. **Increase timeout (Ollama):**
+    ```python
+    # Remote Ollama uses 5s delays (vs 2s local)
+    export OLLAMA_HOST="http://remote:11434"
+    ```
+    
+    3. **Use frontier models:**
+    Claude/GPT-4 have more reliable JSON output than local models.
+  </Accordion>
+  
+  <Accordion title="Fuzzing crashes immediately">
+    **AFL++ setup issues:**
+    
+    1. **Check system config:**
+    ```bash
+    afl-system-config
+    # Follow recommendations
+    ```
+    
+    2. **Disable CPU binding (testing):**
+    ```bash
+    afl-fuzz -d -i input -o output -- ./target
+    ```
+    
+    3. **Verify binary instrumented:**
+    ```bash
+    # Compile with AFL++
+    afl-gcc -o target target.c
+    # Or
+    afl-clang -o target target.c
+    ```
+  </Accordion>
+  
+  <Accordion title="rr debugger not working">
+    **Platform check:** rr only works on Linux x86_64.
+    
+    **Permissions:**
+    ```bash
+    # Allow performance monitoring
+    echo 1 | sudo tee /proc/sys/kernel/perf_event_paranoid
+    ```
+    
+    **Docker:**
+    Ensure `--privileged` flag:
+    ```bash
+    docker run --privileged ...
+    ```
+    
+    **Fallback:** RAPTOR uses GDB on other platforms.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Usage & Workflows
+
+<AccordionGroup>
+  <Accordion title="What's the difference between /scan and /agentic?">
+    | Feature | /scan | /agentic |
+    |---------|-------|----------|
+    | Static analysis | ✅ Yes | ✅ Yes |
+    | LLM analysis | ✅ Yes | ✅ Yes |
+    | Exploit generation | ❌ No | ✅ Yes (optional) |
+    | Patch generation | ❌ No | ✅ Yes (optional) |
+    | Exploitability validation | ❌ No | ✅ Yes (automatic) |
+    | Cost | ~$0.10-0.30 | ~$0.50-2.00 |
+    | Speed | Faster | Slower |
+    
+    **Use /scan when:** You want quick findings without exploits
+    
+    **Use /agentic when:** You want full autonomous analysis with exploits/patches
+  </Accordion>
+  
+  <Accordion title="How do I analyze only specific vulnerability types?">
+    Use policy groups:
+    
+    ```bash
+    # Only secrets
+    python3 raptor.py scan --repo /path --policy_groups secrets
+    
+    # Only security issues (no secrets)
+    python3 raptor.py scan --repo /path --policy_groups security
+    
+    # Custom Semgrep rules
+    python3 raptor.py scan --repo /path --config /path/to/rules.yaml
+    ```
+  </Accordion>
+  
+  <Accordion title="Can RAPTOR fix vulnerabilities automatically?">
+    **Yes, with confirmation:**
+    
+    ```
+    User: /agentic
+    
+    Claude: [Scan completes]
+            Generated patches for 5 vulnerabilities
+            Apply patches? [Y/n]
+    
+    User: Y
+    
+    Claude: ✓ Patches applied successfully
+    ```
+    
+    **Safety:** Dangerous operations (apply patches, git push) require explicit user confirmation.
+  </Accordion>
+  
+  <Accordion title="How do I use RAPTOR for crash analysis?">
+    Use the `/crash-analysis` command:
+    
+    ```bash
+    # Via Claude Code
+    /crash-analysis <bug-tracker-url> <git-repo-url>
+    
+    # Example
+    /crash-analysis https://bugs.project.org/show_bug.cgi?id=12345 https://github.com/project/repo
+    ```
+    
+    **What it does:**
+    1. Clones repository
+    2. Builds target with ASAN
+    3. Records crash with rr
+    4. Analyzes with function tracing
+    5. Generates root-cause report
+    
+    **Requirements:** rr, gcc/clang, gdb, gcov
+  </Accordion>
+  
+  <Accordion title="What is OSS forensics and when should I use it?">
+    `/oss-forensics` performs evidence-backed forensic investigation for public GitHub repositories.
+    
+    **Use cases:**
+    - Supply chain investigation
+    - Malicious commit detection
+    - Deleted content recovery
+    - Timeline reconstruction
+    - Attribution analysis
+    
+    **Example:**
+    ```
+    /oss-forensics "Investigate suspicious commits in owner/repo from Jan 2025"
+    ```
+    
+    **Requirements:** Google Cloud credentials for BigQuery (GitHub Archive)
+    
+    See [OSS Forensics Guide](/commands/oss-forensics) for details.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="Documentation" icon="book" href="/">
+    Browse complete documentation
+  </Card>
+  
+  <Card title="GitHub Issues" icon="github" href="https://github.com/gadievron/raptor/issues">
+    Report bugs and request features
+  </Card>
+  
+  <Card title="Slack Community" icon="slack" href="https://join.slack.com/t/promptgtfo/shared_invite/zt-3kbaqgq2p-O8MAvwU1SPc10KjwJ8MN2w">
+    Chat with developers on #raptor channel
+  </Card>
+  
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get started in 5 minutes
+  </Card>
+</CardGroup>
+
+---
+
+## Still Have Questions?
+
+<Card title="Ask the Community" icon="comments">
+  Join our Slack: **#raptor** on Prompt||GTFO
+  
+  https://join.slack.com/t/promptgtfo/shared_invite/zt-3kbaqgq2p-O8MAvwU1SPc10KjwJ8MN2w
+</Card>

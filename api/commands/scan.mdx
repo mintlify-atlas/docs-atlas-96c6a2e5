@@ -1,0 +1,101 @@
+---
+title: "/scan"
+description: "RAPTOR code security scanning with Semgrep"
+---
+
+## Overview
+
+The `/scan` command performs fast static analysis security testing on source code repositories using Semgrep. It's an alias for `/raptor-scan` and provides quick vulnerability detection for common security issues.
+
+## Syntax
+
+```bash
+python3 raptor.py scan --repo <path> [options]
+```
+
+## Parameters
+
+<ParamField path="repo" type="string" required>
+  Absolute path to the code repository to scan
+</ParamField>
+
+<ParamField path="policy_groups" type="string">
+  Comma-separated list of policy groups (e.g., `secrets,owasp`)
+</ParamField>
+
+<ParamField path="max-findings" type="integer">
+  Maximum number of findings to analyze (default: unlimited)
+</ParamField>
+
+## What It Does
+
+1. Runs Semgrep static analysis with OWASP and security rulesets
+2. Generates SARIF output files with vulnerability findings
+3. Saves results to `out/` directory
+4. Provides quick feedback on common security issues
+
+## Examples
+
+### Basic Scan
+
+```bash
+python3 raptor.py scan --repo /path/to/code
+```
+
+Scans the repository for all security vulnerabilities.
+
+### Targeted Policy Scan
+
+```bash
+python3 raptor.py scan --repo /path/to/code --policy_groups secrets,owasp
+```
+
+Focuses on secrets detection and OWASP vulnerabilities.
+
+### Limited Findings
+
+```bash
+python3 raptor.py scan --repo /path/to/code --max-findings 20
+```
+
+Stops after finding 20 vulnerabilities for quick triage.
+
+## Output Structure
+
+```
+out/scan_<timestamp>/
+├── findings.sarif       # SARIF format findings
+├── report.md           # Human-readable report
+└── findings-summary.json
+```
+
+## Use Cases
+
+- Quick security audit of codebases
+- Pre-commit security checks
+- Initial vulnerability discovery
+- Identifying low-hanging fruit
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="/codeql" href="/api/commands/codeql">
+    Deeper static analysis with dataflow validation
+  </Card>
+  <Card title="/agentic" href="/api/commands/agentic">
+    Full autonomous workflow including scan + analysis + exploit generation
+  </Card>
+  <Card title="/analyze" href="/api/commands/analyze">
+    LLM-based analysis of scan results
+  </Card>
+  <Card title="/validate" href="/api/commands/validate">
+    Validate exploitability of findings
+  </Card>
+</CardGroup>
+
+## Notes
+
+- Always use absolute paths for repositories
+- Semgrep is faster than CodeQL but may miss complex dataflow issues
+- For comprehensive analysis, use `/agentic` instead
+- Results are saved in SARIF format for tool integration

@@ -1,0 +1,136 @@
+---
+title: "/web"
+description: "RAPTOR web application security scanner"
+---
+
+<Warning>
+  The `/web` command is currently in **alpha** and should be considered a stub. It is not yet fully implemented and should not be relied upon for production security testing.
+</Warning>
+
+## Overview
+
+The `/web` command performs security scanning on web applications to detect OWASP Top 10 vulnerabilities. It's an alias for `/raptor-web` and provides automated web application security testing.
+
+## Syntax
+
+```bash
+python3 raptor.py web --url <url> [options]
+```
+
+## Parameters
+
+<ParamField path="url" type="string" required>
+  Full URL of the web application to scan (e.g., https://example.com)
+</ParamField>
+
+<ParamField path="auth-token" type="string">
+  Authentication token for authenticated scanning (e.g., Bearer token)
+</ParamField>
+
+<ParamField path="crawl-depth" type="integer">
+  Maximum depth for web crawler (default: 3)
+</ParamField>
+
+<ParamField path="max-pages" type="integer">
+  Maximum number of pages to scan
+</ParamField>
+
+## What It Does
+
+1. Crawls the target web application
+2. Identifies injection points and attack surfaces
+3. Tests for OWASP Top 10 vulnerabilities
+4. Generates detailed vulnerability reports
+5. Provides remediation guidance
+
+## Examples
+
+### Basic Web Scan
+
+```bash
+python3 raptor.py web --url https://example.com
+```
+
+Scans a public web application.
+
+### Authenticated Scan
+
+```bash
+python3 raptor.py web --url https://example.com --auth-token "Bearer xyz123"
+```
+
+Scans with authentication credentials.
+
+### Limited Scope Scan
+
+```bash
+python3 raptor.py web --url https://example.com --crawl-depth 2 --max-pages 50
+```
+
+Limits scan scope for faster results.
+
+## Vulnerability Types Detected
+
+- **Injection**: SQL injection, command injection, LDAP injection
+- **Broken Authentication**: Session management issues
+- **Sensitive Data Exposure**: Unencrypted data transmission
+- **XML External Entities (XXE)**: XML parsing vulnerabilities
+- **Broken Access Control**: Authorization bypass
+- **Security Misconfiguration**: Server misconfigurations
+- **Cross-Site Scripting (XSS)**: Reflected, stored, DOM-based
+- **Insecure Deserialization**: Object injection
+- **Using Components with Known Vulnerabilities**: Outdated libraries
+- **Insufficient Logging & Monitoring**: Security logging gaps
+
+## Output Structure
+
+```
+out/web_scan_<timestamp>/
+├── findings.json         # Vulnerability findings
+├── crawl-map.json       # Site structure
+├── report.html          # Interactive report
+└── recommendations.md   # Fix guidance
+```
+
+## Use Cases
+
+- Web application security auditing
+- OWASP Top 10 compliance testing
+- Pre-production security validation
+- Bug bounty reconnaissance
+
+## Ethical Usage
+
+<Warning>
+  **Only scan applications you own or have explicit written permission to test.**
+  
+  Unauthorized security testing is illegal and unethical. Always:
+  - Obtain written authorization
+  - Respect scope limitations
+  - Follow responsible disclosure practices
+  - Comply with applicable laws and regulations
+</Warning>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="/scan" href="/api/commands/scan">
+    Static analysis for source code
+  </Card>
+  <Card title="/validate" href="/api/commands/validate">
+    Validate exploitability of findings
+  </Card>
+  <Card title="/exploit" href="/api/commands/exploit">
+    Generate exploit PoCs
+  </Card>
+  <Card title="/patch" href="/api/commands/patch">
+    Generate security patches
+  </Card>
+</CardGroup>
+
+## Notes
+
+- This command is currently in alpha development
+- Results are saved to `out/web_scan_<timestamp>/`
+- For defensive security research and authorized testing only
+- Always follow responsible disclosure practices

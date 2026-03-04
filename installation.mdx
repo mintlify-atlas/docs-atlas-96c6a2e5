@@ -1,0 +1,565 @@
+---
+title: Installation
+description: Complete installation guide for RAPTOR including dependencies, environment setup, and troubleshooting
+---
+
+## Installation methods
+
+RAPTOR offers two installation approaches:
+
+1. **Manual installation** - Install on your own system
+2. **Devcontainer** - Pre-configured Docker environment with all tools
+
+<Warning>
+**Important**: Unless you use the devcontainer, RAPTOR will automatically install tools without asking. Review `DEPENDENCIES.md` first to check licenses.
+</Warning>
+
+## Manual installation
+
+<Steps>
+  <Step title="Install Claude Code">
+    Download Claude Code from [https://claude.ai/download](https://claude.ai/download)
+    
+    This is the recommended interface for interactive security research.
+  </Step>
+
+  <Step title="Clone RAPTOR repository">
+    ```bash
+    git clone https://github.com/gadievron/raptor.git
+    cd raptor
+    ```
+  </Step>
+
+  <Step title="Install Python dependencies">
+    ```bash
+    pip install -r requirements.txt
+    ```
+    
+    **Required packages:**
+    - requests (Apache 2.0)
+    - anthropic (MIT)
+    - tabulate (MIT)
+    - Additional packages listed in `requirements.txt`
+  </Step>
+
+  <Step title="Install Semgrep">
+    ```bash
+    pip install semgrep
+    ```
+    
+    <Note>
+    **License**: LGPL 2.1 - Review license terms before use
+    </Note>
+  </Step>
+
+  <Step title="Configure environment variables">
+    Set up your LLM provider:
+    
+    ```bash
+    # For Anthropic Claude (recommended)
+    export ANTHROPIC_API_KEY=your-key-here
+    
+    # For OpenAI
+    export OPENAI_API_KEY=your-key-here
+    
+    # For local Ollama (free)
+    export OLLAMA_HOST=http://localhost:11434
+    
+    # Optional: LiteLLM configuration
+    export LITELLM_CONFIG_PATH=/path/to/litellm_config.yaml
+    ```
+  </Step>
+
+  <Step title="Open in Claude Code">
+    ```bash
+    claude
+    ```
+    
+    Then say "hi" to get started!
+  </Step>
+</Steps>
+
+## Devcontainer installation
+
+A devcontainer with all prerequisites pre-installed is available for easy onboarding.
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/gadievron/raptor.git
+    cd raptor
+    ```
+  </Step>
+
+  <Step title="Open in VS Code">
+    Use the command **Dev Container: Open Folder in Container** in VS Code or any of its forks (Cursor, Windsurf, etc.)
+  </Step>
+
+  <Step title="Or build with Docker">
+    ```bash
+    docker build -f .devcontainer/Dockerfile -t raptor-devcontainer:latest .
+    ```
+  </Step>
+</Steps>
+
+<Info>
+The devcontainer is massive (~6GB), starting with Microsoft Python 3.12 devcontainer and adding static analysis, fuzzing, and browser automation tools.
+</Info>
+
+### Devcontainer contents
+
+**Pre-installed security tools:**
+- Semgrep (static analysis)
+- CodeQL CLI v2.15.5 (semantic code analysis)
+- AFL++ (fuzzing)
+- rr debugger (deterministic record-replay debugging)
+
+**Build & debugging tools:**
+- gcc, g++, clang-format, make, cmake, autotools
+- gdb, gdb-multiarch, binutils
+
+**Web testing (alpha):**
+- Playwright browser automation (Chromium, Firefox, Webkit browsers)
+- All Playwright browsers pre-downloaded
+
+**Runtime notes:**
+- Runs with `--privileged` flag (required for rr debugger)
+- PYTHONPATH configured for `/workspaces/raptor` imports
+- OSS forensics requires `GOOGLE_APPLICATION_CREDENTIALS` for BigQuery
+
+## Dependencies
+
+### Required tools
+
+<AccordionGroup>
+  <Accordion title="Semgrep (Static analysis scanner)">
+    **Install:**
+    ```bash
+    pip install semgrep
+    ```
+    
+    **License:** LGPL 2.1
+    
+    **Source:** [https://github.com/semgrep/semgrep](https://github.com/semgrep/semgrep)
+    
+    **Usage:** RAPTOR calls `semgrep` command-line tool
+    
+    <Note>
+    User installs separately, not bundled with RAPTOR
+    </Note>
+  </Accordion>
+
+  <Accordion title="Python packages (from requirements.txt)">
+    **Install:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+    
+    **Includes:**
+    - requests (Apache 2.0)
+    - anthropic (MIT)
+    - tabulate (MIT)
+    - Additional packages for LLM integration, analysis, and reporting
+    
+    <Note>
+    Managed by pip, not bundled with RAPTOR
+    </Note>
+  </Accordion>
+</AccordionGroup>
+
+### Optional tools
+
+Install these tools when you need specific capabilities:
+
+<AccordionGroup>
+  <Accordion title="AFL++ (Binary fuzzer)">
+    **Install:**
+    ```bash
+    # macOS
+    brew install afl++
+    
+    # Ubuntu/Debian
+    sudo apt install afl++
+    ```
+    
+    **License:** Apache 2.0
+    
+    **Source:** [https://github.com/AFLplusplus/AFLplusplus](https://github.com/AFLplusplus/AFLplusplus)
+    
+    **Usage:** RAPTOR calls `afl-fuzz` command when using `/fuzz`
+    
+    <Note>
+    Required for binary fuzzing workflows
+    </Note>
+  </Accordion>
+
+  <Accordion title="CodeQL (Static analysis engine)">
+    **Install:** Download from [https://github.com/github/codeql-cli-binaries](https://github.com/github/codeql-cli-binaries)
+    
+    **License:** GitHub CodeQL Terms (free for security research, **no commercial use**)
+    
+    **Source:** [https://github.com/github/codeql](https://github.com/github/codeql)
+    
+    **Usage:** RAPTOR calls `codeql` command for deep analysis
+    
+    <Warning>
+    **Important**: CodeQL does not allow commercial use. Review license terms carefully.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="Ollama (Local model server)">
+    **Install locally:** Download from [https://ollama.ai](https://ollama.ai)
+    
+    **Configure remote:**
+    ```bash
+    # Remote Ollama server
+    export OLLAMA_HOST=https://ollama.example.com:11434
+    
+    # Remote with custom port
+    export OLLAMA_HOST=http://192.168.1.100:8080
+    ```
+    
+    **Default:** `http://localhost:11434`
+    
+    **License:** MIT
+    
+    **Source:** [https://github.com/ollama/ollama](https://github.com/ollama/ollama)
+    
+    **Usage:** RAPTOR connects to Ollama server for local model inference
+    
+    <Info>
+    Supports both local and remote Ollama servers. Remote servers automatically use longer retry delays (5 seconds vs 2 seconds for local) to account for network latency.
+    </Info>
+  </Accordion>
+
+  <Accordion title="rr (Record-replay debugger)">
+    **Install:**
+    ```bash
+    # Linux only
+    sudo apt install rr
+    ```
+    
+    Or build from [https://github.com/rr-debugger/rr](https://github.com/rr-debugger/rr)
+    
+    **License:** MIT
+    
+    **Source:** [https://github.com/rr-debugger/rr](https://github.com/rr-debugger/rr)
+    
+    **Usage:** RAPTOR uses for deterministic debugging in `/crash-analysis` command
+    
+    <Warning>
+    **Linux only** (x86_64 architecture)
+    </Warning>
+  </Accordion>
+
+  <Accordion title="gcov (Code coverage tool)">
+    **Install:** Bundled with gcc (no separate install needed)
+    
+    **License:** GPL (part of GCC)
+    
+    **Source:** [https://gcc.gnu.org/onlinedocs/gcc/Gcov.html](https://gcc.gnu.org/onlinedocs/gcc/Gcov.html)
+    
+    **Usage:** RAPTOR uses for code coverage analysis in `/crash-analysis` command
+    
+    <Info>
+    Automatically available with gcc installation
+    </Info>
+  </Accordion>
+
+  <Accordion title="AddressSanitizer (Memory error detector)">
+    **Install:** Built into gcc >= 4.8 and clang >= 3.1
+    
+    **Compile flag:** `-fsanitize=address`
+    
+    **License:** Apache 2.0
+    
+    **Source:** [https://github.com/google/sanitizers](https://github.com/google/sanitizers)
+    
+    **Usage:** RAPTOR detects ASAN builds for enhanced crash diagnostics
+    
+    <Info>
+    Compile-time instrumentation, enabled via compiler flag
+    </Info>
+  </Accordion>
+
+  <Accordion title="Google Cloud BigQuery (for OSS forensics)">
+    **Setup:** Requires `GOOGLE_APPLICATION_CREDENTIALS` environment variable
+    
+    ```bash
+    export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+    ```
+    
+    **License:** Google Cloud Terms of Service
+    
+    **Source:** [https://cloud.google.com/bigquery](https://cloud.google.com/bigquery)
+    
+    **Usage:** RAPTOR uses for GitHub Archive queries in `/oss-forensics` command
+    
+    **Features:** Query immutable GitHub event data for forensic investigations
+    
+    <Note>
+    Optional - required only for `/oss-forensics` command
+    </Note>
+  </Accordion>
+</AccordionGroup>
+
+### System tools (pre-installed)
+
+These tools are typically pre-installed on most systems:
+
+<AccordionGroup>
+  <Accordion title="LLDB (Debugger)">
+    **Pre-installed:** macOS (Xcode Command Line Tools)
+    
+    **License:** Apache 2.0 (part of LLVM)
+    
+    **Usage:** RAPTOR uses for crash analysis on macOS
+    
+    <Info>
+    Part of operating system, not bundled
+    </Info>
+  </Accordion>
+
+  <Accordion title="GDB (Debugger)">
+    **Pre-installed:** Most Linux distributions
+    
+    **License:** GPL v3
+    
+    **Usage:** RAPTOR uses for crash analysis on Linux
+    
+    **Install on macOS (if needed):**
+    ```bash
+    brew install gdb
+    ```
+    
+    <Info>
+    Part of operating system on Linux, not bundled
+    </Info>
+  </Accordion>
+
+  <Accordion title="Standard Unix tools">
+    **Tools:** nm, addr2line, objdump, file, strings (GNU Binutils)
+    
+    **Pre-installed:** macOS and most Linux distributions
+    
+    **License:** GPL v3
+    
+    **Usage:** RAPTOR uses for binary analysis
+    
+    <Info>
+    Part of operating system, not bundled
+    </Info>
+  </Accordion>
+</AccordionGroup>
+
+## Environment variables
+
+### LLM configuration
+
+<CodeGroup>
+
+```bash Anthropic Claude
+export ANTHROPIC_API_KEY=your-anthropic-key-here
+```
+
+```bash OpenAI
+export OPENAI_API_KEY=your-openai-key-here
+```
+
+```bash Local Ollama
+# Local Ollama (default)
+export OLLAMA_HOST=http://localhost:11434
+```
+
+```bash Remote Ollama
+# Remote Ollama server
+export OLLAMA_HOST=https://ollama.example.com:11434
+
+# Remote with custom port
+export OLLAMA_HOST=http://192.168.1.100:8080
+```
+
+```bash LiteLLM Config
+# Optional: Path to LiteLLM YAML configuration
+export LITELLM_CONFIG_PATH=/path/to/litellm_config.yaml
+```
+
+</CodeGroup>
+
+### BigQuery (for OSS forensics)
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+```
+
+<Note>
+Only required for `/oss-forensics` command
+</Note>
+
+## LLM provider performance
+
+Experimental benchmark for exploit generation:
+
+| Provider             | Exploit Quality         | Cost        |
+|----------------------|-------------------------|-------------|
+| **Anthropic Claude** | ✓ Compilable C code     | ~$0.03/vuln |
+| **OpenAI GPT-4**     | ✓ Compilable C code     | ~$0.03/vuln |
+| **Gemini 2.5**       | ✓ Compilable C code     | ~$0.03/vuln |
+| **Ollama (local)**   | ✗ Often broken          | FREE        |
+
+<Info>
+**Note:** Exploit generation requires frontier models (Claude, GPT, or Gemini). Local models work for analysis but may produce non-compilable exploit code.
+</Info>
+
+### Performance tuning
+
+Remote Ollama servers automatically use longer retry delays to account for network latency:
+
+| Server Type | Base Delay | Retry 1 | Retry 2 | Retry 3 |
+|-------------|------------|---------|---------|------|
+| **Local**   | 2.0s       | 2s      | 4s      | 8s   |
+| **Remote**  | 5.0s       | 5s      | 10s     | 20s  |
+
+## License compliance
+
+### RAPTOR's license
+
+**License:** MIT
+
+**Copyright:** Gadi Evron, Daniel Cuthbert, Thomas Dullien (Halvar Flake), and Michael Bargury
+
+**See:** LICENSE file for full text
+
+### External tool licenses
+
+RAPTOR does not bundle external tools. Users install them separately according to each tool's license terms.
+
+**Summary:**
+- Semgrep (LGPL 2.1) - User installs
+- AFL++ (Apache 2.0) - User installs
+- CodeQL (GitHub Terms) - User installs
+- Python packages (various open source) - User installs via pip
+- System tools (GPL v3, Apache 2.0) - Pre-installed on OS
+
+<Warning>
+**For commercial or restricted use:**
+- Review Semgrep license (LGPL 2.1) for your use case
+- Review CodeQL terms (free for security research, **restrictions apply**)
+- GPL tools (GDB, binutils) are used as command-line tools, not linked libraries
+
+You should review all respective tool licenses on your own. The above is merely informational.
+</Warning>
+
+<Info>
+**RAPTOR's MIT license applies only to RAPTOR's code**, not to external tools users install.
+</Info>
+
+## Troubleshooting
+
+### Common issues
+
+<AccordionGroup>
+  <Accordion title="RAPTOR automatically installs tools">
+    **Solution:** Use the devcontainer to get all tools bundled, or review `DEPENDENCIES.md` before running RAPTOR to understand what will be installed.
+  </Accordion>
+
+  <Accordion title="CodeQL not found">
+    **Solution:** Download CodeQL CLI from [https://github.com/github/codeql-cli-binaries](https://github.com/github/codeql-cli-binaries) and add to PATH.
+  </Accordion>
+
+  <Accordion title="AFL++ not available">
+    **Solution:** Install AFL++:
+    ```bash
+    # macOS
+    brew install afl++
+    
+    # Ubuntu/Debian
+    sudo apt install afl++
+    ```
+  </Accordion>
+
+  <Accordion title="Ollama connection errors">
+    **Solution:** Verify Ollama is running:
+    ```bash
+    # Check if Ollama is running
+    curl $OLLAMA_HOST/api/tags
+    
+    # Start Ollama (if local)
+    ollama serve
+    ```
+    
+    For remote servers, ensure `OLLAMA_HOST` is set correctly with protocol and port.
+  </Accordion>
+
+  <Accordion title="LLM API key errors">
+    **Solution:** Ensure environment variables are set:
+    ```bash
+    # Verify API key is set
+    echo $ANTHROPIC_API_KEY
+    echo $OPENAI_API_KEY
+    
+    # Set in current shell
+    export ANTHROPIC_API_KEY=your-key-here
+    
+    # Or add to ~/.bashrc or ~/.zshrc
+    echo 'export ANTHROPIC_API_KEY=your-key-here' >> ~/.bashrc
+    ```
+  </Accordion>
+
+  <Accordion title="rr debugger not working">
+    **Solution:** rr is Linux-only (x86_64). On macOS, RAPTOR falls back to LLDB. Ensure you're running on a supported platform:
+    ```bash
+    # Check architecture
+    uname -m
+    
+    # Should output: x86_64
+    ```
+  </Accordion>
+
+  <Accordion title="BigQuery authentication errors">
+    **Solution:** Set up Google Cloud credentials:
+    ```bash
+    # Set credentials path
+    export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
+    
+    # Verify file exists
+    ls -l $GOOGLE_APPLICATION_CREDENTIALS
+    ```
+  </Accordion>
+
+  <Accordion title="Python import errors">
+    **Solution:** Ensure PYTHONPATH is set correctly:
+    ```bash
+    # Add RAPTOR to PYTHONPATH
+    export PYTHONPATH=/path/to/raptor:$PYTHONPATH
+    
+    # Or run from RAPTOR root directory
+    cd /path/to/raptor
+    python3 raptor.py
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Getting help
+
+- **Issues:** [https://github.com/gadievron/raptor/issues](https://github.com/gadievron/raptor/issues)
+- **Repository:** [https://github.com/gadievron/raptor](https://github.com/gadievron/raptor)
+- **Documentation:** See `docs/` directory in repository
+- **Community:** Chat on the #raptor channel at the Prompt||GTFO Slack: [https://join.slack.com/t/promptgtfo/shared_invite/zt-3kbaqgq2p-O8MAvwU1SPc10KjwJ8MN2w](https://join.slack.com/t/promptgtfo/shared_invite/zt-3kbaqgq2p-O8MAvwU1SPc10KjwJ8MN2w)
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Get up and running with your first scan
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Learn about RAPTOR's technical architecture
+  </Card>
+  <Card title="Commands" icon="terminal" href="/api/commands/scan">
+    Explore available commands and capabilities
+  </Card>
+  <Card title="LLM Configuration" icon="brain" href="/advanced/llm-configuration">
+    Configure LiteLLM and cost management
+  </Card>
+</CardGroup>

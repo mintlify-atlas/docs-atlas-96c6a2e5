@@ -1,0 +1,674 @@
+---
+title: Creating Custom Personas
+description: Develop expert personas for specialized security analysis and vulnerability assessment
+icon: user-plus
+---
+
+RAPTOR's expert personas provide specialized methodologies for security analysis. You can create custom personas to capture domain-specific expertise and reuse successful approaches.
+
+## Understanding Personas
+
+Personas are expert methodologies extracted from RAPTOR's Python code and made accessible for explicit invocation. They load on-demand (0 tokens until requested) and provide specialized analysis frameworks.
+
+### Available Personas
+
+RAPTOR includes nine built-in expert personas:
+
+| Persona | Expert | Purpose | Token Cost |
+|---------|--------|---------|------------|
+| **Exploit Developer** | Mark Dowd | Generate working PoCs | ~650t |
+| **Crash Analyst** | Charlie Miller / Halvar Flake | Binary crash analysis | ~700t |
+| **Security Researcher** | Research methodology | Vulnerability validation | ~620t |
+| **Patch Engineer** | Senior security engineer | Secure patch creation | ~400t |
+| **Penetration Tester** | Senior pentester | Web payload generation | ~350t |
+| **Fuzzing Strategist** | Expert strategist | Fuzzing decisions | ~300t |
+| **Binary Exploitation Specialist** | Binary expert | Crash exploit generation | ~400t |
+| **CodeQL Dataflow Analyst** | Dataflow expert | Dataflow validation | ~400t |
+| **CodeQL Finding Analyst** | Mark Dowd methodology | CodeQL findings | ~350t |
+
+### How Personas Work
+
+<Steps>
+  <Step title="Explicit Invocation">
+    User requests persona: `"Use exploit developer persona to create PoC"`
+  </Step>
+  <Step title="Load Methodology">
+    Claude loads persona file from `tiers/personas/[name].md`
+  </Step>
+  <Step title="Apply Framework">
+    Persona methodology is applied to the analysis
+  </Step>
+  <Step title="Return Results">
+    Structured verdict, code, or recommendations returned
+  </Step>
+</Steps>
+
+## Persona Structure
+
+A persona file follows this standard format:
+
+```markdown
+# Persona Name (Named Expert)
+# Source: Extracted from [source_file.py]
+# Purpose: Brief purpose description
+# Token cost: ~XXX tokens
+# Usage: "Use [persona name] to [action]"
+
+## Identity
+
+**Role:** Description of the expert role
+
+**Specialization:**
+- Area 1
+- Area 2
+- Area 3
+
+**Purpose:** What this persona helps accomplish
+
+---
+
+## Analysis Framework / Methodology
+
+### 1. First Step
+
+Description and criteria
+
+### 2. Second Step
+
+Description and criteria
+
+### 3. Third Step
+
+Description and criteria
+
+---
+
+## Output Format
+
+Expected output structure with examples
+
+---
+
+## Quality Standards / Checklist
+
+Quality criteria for generated output
+
+---
+
+## Usage
+
+**Invoke explicitly:**
+```
+"Use [persona name] to [action]"
+```
+
+**What happens:**
+1. Load persona (XXX tokens)
+2. Apply methodology
+3. Return results
+
+**Token cost:** 0 until invoked, ~XXX when loaded
+```
+
+## Creating a Custom Persona
+
+Follow these steps to create a new persona:
+
+### Step 1: Define Expertise Domain
+
+Identify the specialized domain:
+
+<Accordion title="Good Persona Domains">
+  - API security analysis
+  - Cloud configuration auditing
+  - Cryptographic implementation review
+  - Container security assessment
+  - Authentication mechanism analysis
+  - Database security configuration
+</Accordion>
+
+<Accordion title="Poor Persona Domains (Too Broad)">
+  - "General security" (use Security Researcher instead)
+  - "Code review" (too generic)
+  - "Testing" (not specific enough)
+</Accordion>
+
+### Step 2: Develop Methodology
+
+Create a systematic approach with clear steps:
+
+```markdown
+## Analysis Framework
+
+### 1. Discovery Phase
+- What to look for
+- Where to find it
+- How to extract it
+
+### 2. Assessment Phase
+- What to check
+- What indicates security issues
+- What indicates good practices
+
+### 3. Validation Phase
+- How to verify findings
+- How to test exploitability
+- How to rule out false positives
+
+### 4. Reporting Phase
+- What to include in report
+- How to prioritize findings
+- What remediation to recommend
+```
+
+### Step 3: Create Persona File
+
+Create a new file in `tiers/personas/`:
+
+```bash
+touch tiers/personas/my_custom_persona.md
+```
+
+### Step 4: Write Persona Content
+
+Use this template:
+
+```markdown
+# My Custom Persona Name
+# Source: Custom persona for [use case]
+# Purpose: [Brief description]
+# Token cost: ~XXX tokens (estimate)
+# Usage: "Use [persona name] to [action]"
+
+## Identity
+
+**Role:** [Expert role description]
+
+**Specialization:**
+- [Area 1]
+- [Area 2]
+- [Area 3]
+
+**Purpose:** [What this persona accomplishes]
+
+---
+
+## Analysis Framework
+
+### 1. [First Step Name]
+
+**Objective:** [What this step accomplishes]
+
+**Process:**
+- [Sub-step 1]
+- [Sub-step 2]
+- [Sub-step 3]
+
+**Indicators:**
+- ✅ [Good indicator]
+- 🔶 [Warning indicator]
+- ❌ [Bad indicator]
+
+### 2. [Second Step Name]
+
+[Follow same pattern]
+
+### 3. [Third Step Name]
+
+[Follow same pattern]
+
+---
+
+## Decision Criteria
+
+**Mark as [VERDICT 1] if:**
+- [Condition 1]
+- [Condition 2]
+- [Condition 3]
+
+**Mark as [VERDICT 2] if:**
+- [Condition 1]
+- [Condition 2]
+
+---
+
+## Output Format
+
+```markdown
+## [PERSONA NAME] ANALYSIS
+
+Target: [What was analyzed]
+
+### [STEP 1 NAME]
+[Results]
+
+### [STEP 2 NAME]
+[Results]
+
+### VERDICT
+
+**[VERDICT]**
+Confidence: [High/Medium/Low]
+
+Reasoning:
+[Detailed explanation]
+
+Recommendations:
+- [Action 1]
+- [Action 2]
+```
+
+---
+
+## Usage
+
+**Invoke explicitly:**
+```
+"Use [persona name] to analyze [target]"
+"[Persona name]: check [specific aspect]"
+```
+
+**What happens:**
+1. Load this persona (XXX tokens)
+2. Apply [methodology name]
+3. Return structured analysis
+
+**Token cost:** 0 until invoked, ~XXX when loaded
+```
+
+## Example: API Security Analyst Persona
+
+Here's a complete example of a custom persona:
+
+```markdown
+# API Security Analyst Persona
+# Source: Custom persona for REST API security
+# Purpose: Systematic API endpoint security analysis
+# Token cost: ~450 tokens
+# Usage: "Use API security analyst to review endpoints"
+
+## Identity
+
+**Role:** Expert API security analyst specializing in REST API vulnerabilities
+
+**Specialization:**
+- Authentication and authorization flaws
+- IDOR (Insecure Direct Object Reference)
+- Rate limiting and abuse prevention
+- Input validation and injection
+- Mass assignment vulnerabilities
+- API versioning security
+
+**Purpose:** Identify security weaknesses in API endpoints and recommend secure implementations
+
+---
+
+## Analysis Framework
+
+### 1. AUTHENTICATION ANALYSIS
+
+**Objective:** Verify proper authentication on all endpoints
+
+**Process:**
+- Identify authentication mechanism (Bearer token, API key, OAuth, etc.)
+- Check if authentication is required on sensitive endpoints
+- Verify token validation happens on every request
+- Assess token strength and entropy
+- Check for token expiration
+
+**Indicators:**
+- ✅ Strong authentication on all sensitive endpoints
+- 🔶 Authentication present but weak (API keys, basic auth)
+- ❌ No authentication required on sensitive endpoints
+
+### 2. AUTHORIZATION ANALYSIS
+
+**Objective:** Prevent unauthorized access to resources
+
+**Process:**
+- Check for object-level authorization (IDOR prevention)
+- Verify function-level authorization (role-based access)
+- Test horizontal privilege escalation (access other users' data)
+- Test vertical privilege escalation (access admin functions)
+- Verify resource ownership validation
+
+**Indicators:**
+- ✅ Ownership checked for all resource access
+- 🔶 Authorization present but may be bypassable
+- ❌ No authorization checks (IDOR vulnerability)
+
+### 3. RATE LIMITING ANALYSIS
+
+**Objective:** Prevent abuse and brute force attacks
+
+**Process:**
+- Check rate limiting on authentication endpoints
+- Check rate limiting on resource-intensive operations
+- Verify rate limits are per-user or per-IP
+- Test if rate limits can be bypassed
+- Assess rate limit thresholds (too high = ineffective)
+
+**Indicators:**
+- ✅ Rate limiting on all sensitive endpoints
+- 🔶 Rate limiting exists but thresholds too high
+- ❌ No rate limiting on login/register/token endpoints
+
+### 4. INPUT VALIDATION ANALYSIS
+
+**Objective:** Prevent injection and validation bypass
+
+**Process:**
+- Check SQL injection in query parameters
+- Check NoSQL injection in filters
+- Check XSS in user-supplied fields
+- Check mass assignment vulnerabilities
+- Verify output encoding
+
+**Indicators:**
+- ✅ Parameterized queries, proper encoding, whitelist validation
+- 🔶 Some validation but may be incomplete
+- ❌ No input validation, string concatenation
+
+---
+
+## Decision Criteria
+
+**Mark as CRITICAL if ANY:**
+- No authentication on sensitive endpoints
+- IDOR vulnerability (access any user's data)
+- SQL/NoSQL injection
+- Mass assignment leading to privilege escalation
+
+**Mark as HIGH if ANY:**
+- Weak authentication (API keys, basic auth over HTTP)
+- Missing authorization checks on some endpoints
+- No rate limiting on authentication
+- XSS in stored user content
+
+**Mark as MEDIUM if ANY:**
+- Rate limits too high
+- Incomplete input validation
+- Information leakage in error messages
+- Missing security headers
+
+**Mark as SECURE if ALL:**
+- Strong authentication (OAuth 2.0, JWT with expiration)
+- Object and function-level authorization
+- Rate limiting on all sensitive endpoints
+- Comprehensive input validation
+- Proper output encoding
+
+---
+
+## Output Format
+
+```markdown
+## API SECURITY ANALYSIS
+
+Endpoint: [HTTP METHOD] [PATH]
+Authentication: [Type]
+
+### AUTHENTICATION
+✅/🔶/❌ [Verdict]
+Findings:
+- [Finding 1]
+- [Finding 2]
+
+### AUTHORIZATION
+✅/🔶/❌ [Verdict]
+Findings:
+- [Finding 1]
+- [Finding 2]
+
+### RATE LIMITING
+✅/🔶/❌ [Verdict]
+Findings:
+- [Finding 1]
+- [Finding 2]
+
+### INPUT VALIDATION
+✅/🔶/❌ [Verdict]
+Findings:
+- [Finding 1]
+- [Finding 2]
+
+### OVERALL VERDICT
+
+**[CRITICAL/HIGH/MEDIUM/SECURE]**
+Confidence: [High/Medium/Low]
+
+Top Issues:
+1. [Issue 1 with severity]
+2. [Issue 2 with severity]
+3. [Issue 3 with severity]
+
+Recommendations:
+1. [Fix 1]
+2. [Fix 2]
+3. [Fix 3]
+
+Exploitability:
+[Attack scenario if exploitable]
+```
+
+---
+
+## Usage
+
+**Invoke explicitly:**
+```
+"Use API security analyst to review /api/users endpoint"
+"API security analyst: check authentication on POST /api/orders"
+"Analyze API security for all endpoints using API analyst persona"
+```
+
+**What happens:**
+1. Load this persona (450 tokens)
+2. Apply 4-step framework (auth, authz, rate limit, validation)
+3. Return structured analysis with severity
+
+**Token cost:** 0 until invoked, ~450 when loaded
+```
+
+## When to Create Custom Personas
+
+Create a custom persona when:
+
+<CardGroup cols={2}>
+  <Card title="Specialized Domain" icon="bullseye">
+    You have deep expertise in a specific security domain
+  </Card>
+  <Card title="Repetitive Analysis" icon="rotate">
+    You perform the same analysis steps frequently
+  </Card>
+  <Card title="Complex Methodology" icon="diagram-project">
+    The analysis requires multiple systematic steps
+  </Card>
+  <Card title="Team Knowledge" icon="users">
+    You want to capture and share team expertise
+  </Card>
+</CardGroup>
+
+### Good Use Cases
+
+- **Cloud Security Auditor:** AWS/Azure/GCP configuration analysis
+- **Container Security Specialist:** Docker/Kubernetes security assessment
+- **Smart Contract Auditor:** Blockchain smart contract vulnerabilities
+- **GraphQL Security Analyst:** GraphQL-specific security issues
+- **Mobile App Security Tester:** Android/iOS security assessment
+- **Infrastructure as Code Auditor:** Terraform/CloudFormation security
+
+### Poor Use Cases
+
+- Generic "security tester" (use Security Researcher)
+- One-time analysis (not worth creating persona)
+- Simple pattern matching (use Semgrep rules instead)
+- Language-agnostic checks (use existing tools)
+
+## Loading Custom Personas
+
+Once created, invoke your persona in Claude Code:
+
+```
+"Use API security analyst persona to review /api/users endpoint"
+```
+
+Claude will:
+1. Load `tiers/personas/api_security_analyst.md`
+2. Apply the 4-step framework
+3. Return structured analysis
+
+## Persona Best Practices
+
+### Keep It Focused
+
+<Tabs>
+  <Tab title="Good: Focused" icon="check">
+    **API Authentication Analyst**
+    - Focuses solely on API authentication
+    - Deep expertise in token security
+    - Clear decision criteria
+  </Tab>
+  <Tab title="Bad: Too Broad" icon="xmark">
+    **API Analyst**
+    - Tries to cover all API security
+    - Shallow coverage of many topics
+    - Unclear when to use
+  </Tab>
+</Tabs>
+
+### Provide Clear Criteria
+
+```markdown
+## Decision Criteria
+
+**Mark as VULNERABLE if:**
+- Specific condition 1 (measurable)
+- Specific condition 2 (testable)
+- Specific condition 3 (objective)
+
+**Mark as SECURE if:**
+- Opposite conditions with clear thresholds
+```
+
+Avoid vague criteria like "if it looks insecure" or "if there might be issues."
+
+### Include Real Examples
+
+```markdown
+## Examples
+
+### Vulnerable Code
+```python
+# No authorization check - IDOR vulnerability
+@app.route('/api/user/<user_id>')
+def get_user(user_id):
+    return User.query.get(user_id)
+```
+
+### Secure Code
+```python
+# Proper ownership validation
+@app.route('/api/user/<user_id>')
+@login_required
+def get_user(user_id):
+    if current_user.id != user_id and not current_user.is_admin:
+        abort(403)
+    return User.query.get(user_id)
+```
+```
+
+### Estimate Token Cost
+
+Roughly estimate token count:
+- ~4 characters per token
+- Simple persona: 300-400 tokens
+- Medium persona: 400-600 tokens
+- Complex persona: 600-800 tokens
+
+Keep under 1,000 tokens to avoid context bloat.
+
+### Test Your Persona
+
+Before finalizing:
+
+1. **Test invocation:** Can Claude load and apply it?
+2. **Test clarity:** Are decision criteria clear and actionable?
+3. **Test usefulness:** Does it provide value over generic analysis?
+4. **Test edge cases:** Does it handle unusual situations?
+
+## Integration with Skills
+
+<Info>
+Personas provide **methodology**, while skills provide **reusable approaches**. They complement each other.
+</Info>
+
+**Persona:** Expert framework (exploit developer, crash analyst)
+**Skill:** Specific technique (ROP chain building, heap exploitation)
+
+```
+User: Use crash analyst persona with ROP chain skill
+
+Claude: [Loads crash_analyst.md - methodology]
+        [Loads rop_chain_skill.md - technique]
+        [Combines both for comprehensive analysis]
+```
+
+## Versioning and Maintenance
+
+### Version Your Personas
+
+```markdown
+# API Security Analyst Persona v2.0
+# Last updated: 2024-03-04
+# Changelog:
+# - v2.0: Added GraphQL support
+# - v1.1: Enhanced IDOR detection
+# - v1.0: Initial release
+```
+
+### Update Regularly
+
+- **New attack techniques:** Add to methodology
+- **False positives:** Refine decision criteria
+- **User feedback:** Incorporate lessons learned
+- **Tool evolution:** Update references
+
+## Sharing Personas
+
+Share personas with your team:
+
+1. **Commit to repository:** `tiers/personas/team/`
+2. **Document in README:** Update persona list
+3. **Provide examples:** Include usage examples
+4. **Train team:** Show how to invoke
+
+## Summary
+
+Creating custom personas:
+
+1. **Identify** specialized domain
+2. **Develop** systematic methodology
+3. **Create** persona file in `tiers/personas/`
+4. **Test** with real analysis
+5. **Refine** based on results
+6. **Share** with team
+
+Personas capture expertise and make it reusable across your security practice.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Claude Code Usage" icon="comments" href="/guides/claude-code-usage">
+    Learn how to invoke personas interactively
+  </Card>
+  <Card title="Extending RAPTOR" icon="code-branch" href="/guides/extending-raptor">
+    Add custom scanners and agents
+  </Card>
+  <Card title="Python CLI" icon="terminal" href="/guides/python-cli">
+    Use RAPTOR from command line
+  </Card>
+  <Card title="Existing Personas" icon="users" href="/reference/personas">
+    Reference for built-in personas
+  </Card>
+</CardGroup>

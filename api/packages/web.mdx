@@ -1,0 +1,626 @@
+---
+title: "Web"
+description: "Autonomous web application security testing with intelligent crawling and fuzzing"
+icon: "globe"
+---
+
+## Overview
+
+The Web package provides autonomous web application security testing capabilities. It combines intelligent crawling, parameter discovery, and LLM-guided fuzzing for comprehensive web vulnerability detection.
+
+## Purpose
+
+Automate web security testing with:
+- **Intelligent crawling**: Discover pages, forms, and APIs
+- **Parameter discovery**: Find hidden parameters and endpoints
+- **LLM-guided fuzzing**: Context-aware payload generation
+- **Authentication handling**: Session management and auth workflows
+- **API discovery**: REST and GraphQL endpoint detection
+
+## Architecture
+
+```python
+packages/web/
+├── scanner.py              # Main orchestrator
+├── crawler.py              # Web crawling engine
+├── fuzzer.py               # Intelligent fuzzing
+└── client.py               # HTTP client with session management
+```
+
+## Quick Start
+
+### Basic Web Scan
+
+```python
+from packages.web import WebScanner
+from packages.llm_analysis.llm import LLMClient
+from pathlib import Path
+
+# Initialize LLM client
+llm = LLMClient()
+
+# Initialize scanner
+scanner = WebScanner(
+    base_url="https://example.com",
+    llm=llm,
+    out_dir=Path("out/web_scan"),
+    verify_ssl=True
+)
+
+# Run scan
+results = scanner.scan()
+
+print(f"Pages discovered: {results['discovery']['pages_found']}")
+print(f"Parameters found: {results['discovery']['parameters_found']}")
+print(f"Vulnerabilities: {results['total_vulnerabilities']}")
+```
+
+### CLI Usage
+
+```bash
+# Scan a web application
+python3 -m packages.web.scanner \
+  --url https://example.com \
+  --max-depth 3 \
+  --max-pages 50
+
+# Skip SSL verification (for testing)
+python3 -m packages.web.scanner \
+  --url https://localhost:8443 \
+  --insecure
+```
+
+## Core Classes
+
+### WebScanner
+
+Main autonomous web security scanner.
+
+```python
+class WebScanner:
+    def __init__(
+        self,
+        base_url: str,
+        llm: LLMProvider,
+        out_dir: Path,
+        verify_ssl: bool = True
+    )
+    
+    def scan(self) -> Dict[str, Any]
+```
+
+<ParamField path="base_url" type="str" required>
+  Target web application URL
+</ParamField>
+
+<ParamField path="llm" type="LLMProvider" required>
+  LLM provider for intelligent fuzzing
+</ParamField>
+
+<ParamField path="out_dir" type="Path" required>
+  Output directory for scan results
+</ParamField>
+
+<ParamField path="verify_ssl" type="bool" default="True">
+  Verify SSL/TLS certificates
+</ParamField>
+
+<ResponseField name="discovery" type="Dict">
+  Discovery results (pages, parameters, forms)
+</ResponseField>
+
+<ResponseField name="findings" type="List[Dict]">
+  Vulnerability findings
+</ResponseField>
+
+<ResponseField name="total_vulnerabilities" type="int">
+  Total vulnerabilities found
+</ResponseField>
+
+### WebCrawler
+
+Intelligent web crawler.
+
+```python
+class WebCrawler:
+    def __init__(
+        self,
+        client: WebClient,
+        max_depth: int = 3,
+        max_pages: int = 100
+    )
+    
+    def crawl(
+        self,
+        start_url: str
+    ) -> Dict[str, Any]
+    
+    def discover_parameters(
+        self,
+        url: str
+    ) -> List[Dict[str, str]]
+    
+    def discover_api_endpoints(
+        self,
+        base_url: str
+    ) -> List[str]
+```
+
+<ParamField path="max_depth" type="int" default="3">
+  Maximum crawl depth
+</ParamField>
+
+<ParamField path="max_pages" type="int" default="100">
+  Maximum pages to crawl
+</ParamField>
+
+<ResponseField name="pages_found" type="List[str]">
+  Discovered URLs
+</ResponseField>
+
+<ResponseField name="forms_found" type="List[Dict]">
+  HTML forms with inputs
+</ResponseField>
+
+<ResponseField name="parameters_found" type="List[Dict]">
+  Query and form parameters
+</ResponseField>
+
+<ResponseField name="api_endpoints" type="List[str]">
+  Discovered API endpoints
+</ResponseField>
+
+### WebFuzzer
+
+LLM-guided intelligent fuzzing.
+
+```python
+class WebFuzzer:
+    def __init__(
+        self,
+        client: WebClient,
+        llm: LLMProvider
+    )
+    
+    def fuzz_parameter(
+        self,
+        url: str,
+        parameter: Dict[str, str],
+        vulnerability_types: List[str] = None
+    ) -> List[Dict[str, Any]]
+    
+    def fuzz_form(
+        self,
+        form: Dict[str, Any]
+    ) -> List[Dict[str, Any]]
+    
+    def fuzz_api_endpoint(
+        self,
+        endpoint: str,
+        method: str = "GET"
+    ) -> List[Dict[str, Any]]
+```
+
+<ParamField path="vulnerability_types" type="List[str]">
+  Types to test: "sqli", "xss", "command_injection", "path_traversal", "xxe"
+</ParamField>
+
+<ResponseField name="findings" type="List[Dict]">
+  Detected vulnerabilities with evidence
+</ResponseField>
+
+### WebClient
+
+HTTP client with session management.
+
+```python
+class WebClient:
+    def __init__(
+        self,
+        base_url: str,
+        verify_ssl: bool = True,
+        timeout: int = 30
+    )
+    
+    def get(
+        self,
+        path: str,
+        params: Dict = None
+    ) -> requests.Response
+    
+    def post(
+        self,
+        path: str,
+        data: Dict = None,
+        json: Dict = None
+    ) -> requests.Response
+    
+    def set_auth(
+        self,
+        username: str,
+        password: str
+    ) -> None
+    
+    def set_headers(
+        self,
+        headers: Dict[str, str]
+    ) -> None
+```
+
+## Crawling
+
+### Basic Crawling
+
+```python
+from packages.web import WebCrawler, WebClient
+
+client = WebClient(base_url="https://example.com")
+crawler = WebCrawler(
+    client=client,
+    max_depth=3,
+    max_pages=50
+)
+
+results = crawler.crawl("https://example.com")
+
+print(f"Pages: {len(results['pages_found'])}")
+for page in results['pages_found']:
+    print(f"  {page}")
+
+print(f"\nForms: {len(results['forms_found'])}")
+for form in results['forms_found']:
+    print(f"  Action: {form['action']}")
+    print(f"  Inputs: {form['inputs']}")
+```
+
+### API Discovery
+
+```python
+# Discover REST/GraphQL endpoints
+api_endpoints = crawler.discover_api_endpoints(
+    base_url="https://api.example.com"
+)
+
+for endpoint in api_endpoints:
+    print(f"Found API: {endpoint}")
+```
+
+### Parameter Discovery
+
+```python
+# Find parameters in URL/forms
+params = crawler.discover_parameters(
+    url="https://example.com/search"
+)
+
+for param in params:
+    print(f"Parameter: {param['name']}")
+    print(f"  Type: {param['type']}")  # query, form, cookie
+    print(f"  Location: {param['location']}")
+```
+
+## Fuzzing
+
+### SQL Injection
+
+```python
+from packages.web import WebFuzzer
+
+fuzzer = WebFuzzer(client=client, llm=llm)
+
+# Fuzz for SQL injection
+findings = fuzzer.fuzz_parameter(
+    url="https://example.com/user",
+    parameter={"name": "id", "type": "query", "value": "1"},
+    vulnerability_types=["sqli"]
+)
+
+for finding in findings:
+    print(f"\nVulnerability: {finding['type']}")
+    print(f"Payload: {finding['payload']}")
+    print(f"Evidence: {finding['evidence']}")
+    print(f"Severity: {finding['severity']}")
+```
+
+### Cross-Site Scripting (XSS)
+
+```python
+# Test for XSS
+findings = fuzzer.fuzz_parameter(
+    url="https://example.com/comment",
+    parameter={"name": "text", "type": "form", "value": "hello"},
+    vulnerability_types=["xss"]
+)
+```
+
+### Command Injection
+
+```python
+# Test for command injection
+findings = fuzzer.fuzz_parameter(
+    url="https://example.com/ping",
+    parameter={"name": "host", "type": "form", "value": "localhost"},
+    vulnerability_types=["command_injection"]
+)
+```
+
+### Multiple Vulnerabilities
+
+```python
+# Test for multiple vulnerability types
+findings = fuzzer.fuzz_parameter(
+    url="https://example.com/api/search",
+    parameter={"name": "query", "type": "query", "value": "test"},
+    vulnerability_types=["sqli", "xss", "command_injection", "path_traversal"]
+)
+```
+
+## Complete Scan
+
+### Autonomous Web Scan
+
+```python
+from packages.web import WebScanner
+from packages.llm_analysis.llm import LLMClient
+from pathlib import Path
+import json
+
+# Initialize
+llm = LLMClient()
+scanner = WebScanner(
+    base_url="https://vulnerable-app.com",
+    llm=llm,
+    out_dir=Path("out/web_scan"),
+    verify_ssl=True
+)
+
+# Run scan
+print("Starting web security scan...")
+results = scanner.scan()
+
+# Analyze results
+print("\n=== Scan Results ===")
+print(f"Pages discovered: {results['discovery']['pages_found']}")
+print(f"Forms discovered: {results['discovery']['forms_found']}")
+print(f"Parameters discovered: {results['discovery']['parameters_found']}")
+print(f"API endpoints: {results['discovery']['api_endpoints']}")
+
+print(f"\n=== Vulnerabilities ===")
+print(f"Total: {results['total_vulnerabilities']}")
+
+by_type = {}
+for finding in results['findings']:
+    vuln_type = finding['type']
+    by_type[vuln_type] = by_type.get(vuln_type, 0) + 1
+
+for vuln_type, count in by_type.items():
+    print(f"  {vuln_type}: {count}")
+
+# Save detailed report
+with open("out/web_scan/report.json", "w") as f:
+    json.dump(results, f, indent=2)
+
+print("\nDetailed report saved to out/web_scan/report.json")
+```
+
+## Authentication
+
+### Basic Auth
+
+```python
+client = WebClient(base_url="https://example.com")
+client.set_auth(username="admin", password="password")
+
+crawler = WebCrawler(client=client)
+results = crawler.crawl("/admin")
+```
+
+### Session Auth
+
+```python
+# Login and store session
+client = WebClient(base_url="https://example.com")
+
+# Perform login
+response = client.post("/login", data={
+    "username": "admin",
+    "password": "password"
+})
+
+# Session cookie automatically stored
+crawler = WebCrawler(client=client)
+results = crawler.crawl("/dashboard")
+```
+
+### Custom Headers
+
+```python
+# Set custom headers (API keys, tokens)
+client.set_headers({
+    "Authorization": "Bearer eyJhbGc...",
+    "X-API-Key": "abc123"
+})
+```
+
+## Vulnerability Detection
+
+### SQL Injection Detection
+
+```python
+# Fuzzer generates intelligent payloads
+payloads = [
+    "1' OR '1'='1",
+    "1'; DROP TABLE users--",
+    "1 UNION SELECT NULL,NULL--"
+]
+
+# LLM analyzes response for SQL errors:
+# - "SQL syntax error"
+# - "mysql_fetch_array()"
+# - Database error messages
+```
+
+### XSS Detection
+
+```python
+# Tests for reflected/stored XSS
+payloads = [
+    "<script>alert('XSS')</script>",
+    "<img src=x onerror=alert('XSS')>",
+    "javascript:alert('XSS')"
+]
+
+# Checks if payload appears in response unescaped
+```
+
+### Command Injection
+
+```python
+# OS command injection payloads
+payloads = [
+    "; ls -la",
+    "| whoami",
+    "&& cat /etc/passwd"
+]
+
+# Looks for command output in response
+```
+
+## Configuration
+
+### Crawler Configuration
+
+```python
+crawler = WebCrawler(
+    client=client,
+    max_depth=5,              # Maximum link depth
+    max_pages=200,            # Maximum pages to crawl
+    respect_robots=True,      # Follow robots.txt
+    user_agent="RAPTOR/1.0",  # Custom user agent
+    delay=0.5                 # Delay between requests (seconds)
+)
+```
+
+### Fuzzer Configuration
+
+```python
+fuzzer = WebFuzzer(
+    client=client,
+    llm=llm,
+    max_payloads=50,          # Max payloads per parameter
+    timeout=10,               # Request timeout
+    verify_findings=True      # Verify vulnerabilities
+)
+```
+
+### Client Configuration
+
+```python
+client = WebClient(
+    base_url="https://example.com",
+    verify_ssl=True,
+    timeout=30,
+    max_retries=3,
+    proxy=None  # Or {"http": "...", "https": "..."}
+)
+```
+
+## Output Structure
+
+```
+out/web_scan_{timestamp}/
+├── crawl_results.json         # Crawling results
+│   ├── pages_found
+│   ├── forms_found
+│   ├── parameters_found
+│   └── api_endpoints
+├── web_scan_report.json      # Vulnerability report
+│   ├── discovery stats
+│   ├── findings (with evidence)
+│   └── total_vulnerabilities
+└── requests.log              # HTTP request log
+```
+
+### Report Example
+
+```json
+{
+  "target": "https://vulnerable-app.com",
+  "timestamp": "2026-03-04T12:00:00Z",
+  "discovery": {
+    "pages_found": 47,
+    "forms_found": 12,
+    "parameters_found": 38,
+    "api_endpoints": 8
+  },
+  "findings": [
+    {
+      "type": "sql_injection",
+      "url": "https://vulnerable-app.com/user?id=1",
+      "parameter": "id",
+      "payload": "1' OR '1'='1",
+      "evidence": "SQL syntax error in response",
+      "severity": "critical",
+      "confidence": 0.95
+    }
+  ],
+  "total_vulnerabilities": 15
+}
+```
+
+## Performance
+
+### Crawling Speed
+
+- **Pages/second**: 2-5 (depends on delay)
+- **Typical scan**: 50 pages in 2-5 minutes
+- **With delay**: Slower but stealthier
+
+### Fuzzing Speed
+
+- **Per parameter**: 30-60 seconds (depends on payloads)
+- **LLM-guided**: Smarter payloads, fewer requests
+- **Full scan**: 10-30 minutes (depends on scope)
+
+## Integration
+
+### With Static Analysis
+
+```python
+# Complement static analysis with dynamic testing
+from packages.static_analysis import main as scan_repo
+from packages.web import WebScanner
+
+# 1. Static analysis
+scan_repo()  # Find code-level issues
+
+# 2. Dynamic testing
+scanner = WebScanner(...)
+scanner.scan()  # Validate runtime behavior
+```
+
+### With LLM Analysis
+
+```python
+# LLM analyzes findings for deeper understanding
+from packages.llm_analysis import AutonomousSecurityAgentV2
+
+agent = AutonomousSecurityAgentV2(...)
+for finding in results['findings']:
+    analysis = agent.analyze_web_vulnerability(finding)
+    exploit = agent.generate_exploit(analysis)
+```
+
+## Related Packages
+
+- [LLM Analysis](/api/packages/llm-analysis) - AI-powered vulnerability analysis
+- [Static Analysis](/api/packages/static-analysis) - Code-level scanning
+- [Exploitability Validation](/api/packages/exploitability-validation) - Validate findings
+
+## Best Practices
+
+1. **Start with limited scope** (max_depth=2, max_pages=50)
+2. **Use delays** to avoid rate limiting
+3. **Authenticate properly** for protected areas
+4. **Verify SSL** in production, skip for testing only
+5. **Review findings manually** before reporting

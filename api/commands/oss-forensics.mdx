@@ -1,0 +1,370 @@
+---
+title: "/oss-forensics"
+description: "Evidence-backed forensic investigation for public GitHub repositories"
+---
+
+## Overview
+
+The `/oss-forensics` command provides evidence-backed forensic investigation for public GitHub repositories. It uses GitHub Archive (BigQuery), GitHub API, Wayback Machine recovery, and local git analysis to investigate security incidents, supply chain attacks, and suspicious activities.
+
+<Warning>
+  Requires `GOOGLE_APPLICATION_CREDENTIALS` for BigQuery access to GitHub Archive.
+</Warning>
+
+## Syntax
+
+```bash
+/oss-forensics "<investigation-prompt>" [--max-followups N] [--max-retries N]
+```
+
+## Parameters
+
+<ParamField path="investigation-prompt" type="string" required>
+  Natural language description of what to investigate
+</ParamField>
+
+<ParamField path="max-followups" type="integer" default="3">
+  Maximum evidence collection rounds for followup investigations
+</ParamField>
+
+<ParamField path="max-retries" type="integer" default="3">
+  Maximum hypothesis revision rounds if validation fails
+</ParamField>
+
+## What It Does
+
+1. **Parses investigation prompt** and forms research question
+2. **Spawns parallel evidence collectors** (5 specialist agents)
+3. **Queries immutable archives** (GitHub Archive via BigQuery)
+4. **Recovers deleted content** (Wayback Machine, dangling commits)
+5. **Forms evidence-backed hypotheses** with followup requests
+6. **Verifies all evidence** against original sources
+7. **Validates claims** against verified evidence
+8. **Generates forensic report** with timeline, attribution, IOCs
+
+## Investigation Workflow
+
+The forensics workflow executes these phases automatically:
+
+### Phase 0: Initialize
+
+Runs initialization script to set up investigation workspace.
+
+### Phase 1: Parse Prompt
+
+Converts natural language prompt to structured research question.
+
+### Phase 2: Evidence Collection (Parallel)
+
+Spawns 4-5 investigators in parallel:
+
+- **oss-investigator-gh-archive-agent**: Queries GitHub Archive (BigQuery) for immutable event history
+- **oss-investigator-github-agent**: Queries GitHub API and recovers commits by SHA
+- **oss-investigator-wayback-agent**: Recovers deleted content from Wayback Machine
+- **oss-investigator-local-git-agent**: Analyzes cloned repos for dangling commits
+- **oss-investigator-ioc-extractor-agent**: Extracts IOCs from vendor reports (if URL provided)
+
+### Phase 3: Hypothesis Formation Loop
+
+**oss-hypothesis-former-agent** analyzes evidence and:
+
+- Forms evidence-backed hypothesis
+- Identifies loose ends
+- Requests followup evidence collection
+- Iterates until `--max-followups` reached
+
+### Phase 4: Evidence Verification
+
+**oss-evidence-verifier-agent** verifies all evidence:
+
+- Re-queries original sources
+- Marks evidence as verified/failed
+- Updates EvidenceStore
+
+### Phase 5: Hypothesis Validation Loop
+
+**oss-hypothesis-checker-agent** validates claims:
+
+- Checks each claim against verified evidence
+- Rejects unsupported claims
+- Requests revision if needed
+- Iterates until `--max-retries` reached
+
+### Phase 6: Generate Report
+
+**oss-report-generator-agent** produces final forensic report:
+
+- Timeline of events
+- Attribution analysis
+- Indicators of Compromise (IOCs)
+- Evidence references
+
+### Phase 7: Completion
+
+Informs user of output location.
+
+## Examples
+
+### Investigate User Activity
+
+```bash
+/oss-forensics "Investigate lkmanka58's activity on aws/aws-toolkit-vscode"
+```
+
+Investigates a specific user's actions on a repository.
+
+### Validate Vendor Report
+
+```bash
+/oss-forensics "Validate claims in this vendor report: https://example.com/supply-chain-attack-report"
+```
+
+Verifies claims made in security vendor blog posts.
+
+### Investigate Specific Incident
+
+```bash
+/oss-forensics "What happened with the stability tag on aws/aws-toolkit-vscode on July 13, 2025?"
+```
+
+Investigates a specific incident with timeline.
+
+### Extended Investigation
+
+```bash
+/oss-forensics "Investigate the July 13 incident on aws/aws-toolkit-vscode" --max-followups 5
+```
+
+Allows more rounds of evidence collection for complex cases.
+
+## Prerequisites
+
+### Google Cloud Credentials
+
+<ParamField path="GOOGLE_APPLICATION_CREDENTIALS" type="environment" required>
+  Path to Google Cloud service account JSON for BigQuery access
+  
+  ```bash
+  export GOOGLE_APPLICATION_CREDENTIALS="/path/to/credentials.json"
+  ```
+  
+  See `.claude/skills/oss-forensics/github-archive/SKILL.md` for setup instructions.
+</ParamField>
+
+### Internet Access
+
+Required for:
+
+- GitHub API queries
+- Wayback Machine recovery
+- BigQuery queries
+
+## Evidence Sources
+
+### GitHub Archive (Immutable)
+
+Queries GH Archive via BigQuery:
+
+- All public GitHub events since 2011
+- Immutable historical record
+- Push events, PR events, issue events, release events
+- User activity patterns
+
+**Example query**:
+
+```sql
+SELECT type, actor.login, created_at, payload
+FROM `githubarchive.day.20250713`
+WHERE repo.name = 'aws/aws-toolkit-vscode'
+  AND actor.login = 'lkmanka58'
+ORDER BY created_at
+```
+
+### GitHub API (Live)
+
+Queries current state:
+
+- Repositories
+- Commits (including by SHA if deleted from branches)
+- Issues and pull requests
+- Releases and tags
+- User profiles
+
+### Wayback Machine (Recovery)
+
+Recovers deleted content:
+
+- Deleted repository files
+- Removed documentation
+- Historical README versions
+- Deleted issues/PRs (if archived)
+
+### Local Git Analysis (Forensics)
+
+Analyzes cloned repositories:
+
+- Dangling commits (deleted but not garbage collected)
+- Reflog analysis
+- Hidden branches
+- Force-push history
+
+### Vendor Reports (IOCs)
+
+Extracts indicators from security reports:
+
+- SHA-256 hashes
+- Repository URLs
+- User accounts
+- Timestamps
+- Attack techniques
+
+## Output Structure
+
+```
+.out/oss-forensics-<timestamp>/
+├── evidence.json                    # EvidenceStore (all collected evidence)
+├── evidence-verification-report.md  # Verification results
+├── hypothesis-v1.md                 # Initial hypothesis
+├── hypothesis-v2.md                 # Revised hypothesis (if needed)
+├── hypothesis-confirmed.md          # Final validated hypothesis
+├── forensic-report.md              # Human-readable investigation report
+└── investigation-workspace/         # Working files
+    ├── gh-archive-queries/
+    ├── github-api-responses/
+    ├── wayback-recovery/
+    └── local-git-analysis/
+```
+
+## Forensic Report Format
+
+```markdown
+# OSS Forensic Investigation Report
+
+## Executive Summary
+Investigation of suspicious activity on aws/aws-toolkit-vscode on July 13, 2025.
+
+## Research Question
+What actions did user lkmanka58 take, and were they authorized?
+
+## Timeline of Events
+
+**2025-07-13 08:23:15 UTC**  
+- Event: PushEvent to main branch  
+- Actor: lkmanka58  
+- Evidence: GH Archive (verified)  
+- Commits: abc123, def456
+
+**2025-07-13 08:24:32 UTC**  
+- Event: CreateEvent for tag "stability"  
+- Actor: lkmanka58  
+- Evidence: GH Archive (verified)
+
+**2025-07-13 08:30:00 UTC**  
+- Event: DeleteEvent for tag "stability"  
+- Actor: different-user  
+- Evidence: GH Archive (verified)
+
+## Attribution Analysis
+
+**Actor**: lkmanka58  
+**Account Age**: 2 days  
+**Other Activity**: None  
+**Assessment**: Likely compromised account
+
+## Indicators of Compromise (IOCs)
+
+- **Commit SHA**: abc123def456...  
+- **Tag Name**: stability  
+- **User Account**: lkmanka58  
+- **IP Address**: (not available in GitHub Archive)
+
+## Evidence Summary
+
+- 5 GH Archive events (verified)
+- 2 GitHub API commits (verified)
+- 1 Wayback snapshot (verified)
+- 0 dangling commits found
+
+## Conclusions
+
+1. User lkmanka58 created suspicious tag on July 13
+2. Tag was quickly deleted by maintainer
+3. Account shows signs of compromise (new, single-purpose)
+4. No malicious code merged (tag only)
+
+## Recommendations
+
+1. Investigate lkmanka58 account creation
+2. Review other repositories for similar tags
+3. Implement tag protection rules
+4. Enable 2FA for all contributors
+```
+
+## Use Cases
+
+- **Supply chain attack investigation**: Trace malicious commits
+- **Incident response**: Understand what happened and when
+- **Threat intelligence**: Extract IOCs and TTPs
+- **Vendor report validation**: Verify claims with evidence
+- **Attribution analysis**: Identify threat actors
+- **Timeline reconstruction**: Build event sequences
+
+## Evidence Verification
+
+<Info>
+  All evidence is verified against original sources before being used in hypotheses.
+</Info>
+
+The verification process:
+
+1. **Collection**: Agents collect evidence with source references
+2. **Storage**: Evidence stored in EvidenceStore with metadata
+3. **Verification**: Re-query original source to confirm
+4. **Status**: Mark as verified/failed
+5. **Usage**: Only verified evidence used in final report
+
+Example:
+
+```json
+{
+  "evidence_id": "E001",
+  "source": "gh-archive",
+  "query": "SELECT * FROM githubarchive.day.20250713 WHERE ...",
+  "result": { ... },
+  "collected_at": "2025-07-14T10:30:00Z",
+  "verified": true,
+  "verified_at": "2025-07-14T10:35:00Z"
+}
+```
+
+## Skills Referenced
+
+The forensics workflow uses skills from `.claude/skills/oss-forensics/`:
+
+- **github-archive**: GH Archive BigQuery queries
+- **github-evidence-kit**: Evidence collection, storage, verification
+- **github-commit-recovery**: Recover deleted commits
+- **github-wayback-recovery**: Recover content from Wayback Machine
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="/crash-analysis" href="/api/commands/crash-analysis">
+    Root-cause analysis for crashes
+  </Card>
+  <Card title="/validate" href="/api/commands/validate">
+    Vulnerability validation pipeline
+  </Card>
+  <Card title="/scan" href="/api/commands/scan">
+    Source code security scanning
+  </Card>
+</CardGroup>
+
+## Notes
+
+- Requires `GOOGLE_APPLICATION_CREDENTIALS` for BigQuery
+- Internet access required for GitHub API and Wayback Machine
+- Evidence is verified before use in reports
+- Produces audit trail of investigation process
+- All evidence includes source references
+- For security research and incident response

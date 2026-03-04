@@ -1,0 +1,421 @@
+---
+title: 'Web Application Scanning'
+description: 'Autonomous web security testing with crawling, fuzzing, and vulnerability detection'
+---
+
+<Warning>
+**Alpha Status**: The web scanner is currently in early alpha development. Features are incomplete and APIs may change. Use for research and testing only.
+</Warning>
+
+## Overview
+
+RAPTOR's web scanner provides autonomous security testing for web applications through intelligent crawling, parameter discovery, and LLM-guided fuzzing.
+
+## Architecture
+
+```
+packages/web/
+├── scanner.py          # Main orchestrator
+├── crawler.py          # Web discovery & crawling
+├── fuzzer.py           # Intelligent fuzzing
+├── client.py           # HTTP client wrapper
+└── __init__.py
+```
+
+<Note>
+**Current Status**: The web scanner is a **work-in-progress stub**. Core components (crawler, fuzzer) are in active development. The architecture is in place but functionality is limited.
+</Note>
+
+## Current Capabilities
+
+### WebScanner (Alpha)
+
+Main orchestration class:
+
+```python
+from packages.web import WebScanner
+from packages.llm_analysis.llm.client import LLMClient
+
+scanner = WebScanner(
+    base_url="https://example.com",
+    llm=LLMClient(),
+    out_dir=Path("out/web_scan"),
+    verify_ssl=True
+)
+
+results = scanner.scan()
+```
+
+### WebClient
+
+HTTP client with session management:
+
+```python
+from packages.web import WebClient
+
+client = WebClient(
+    base_url="https://example.com",
+    verify_ssl=True
+)
+
+response = client.get("/api/endpoint")
+```
+
+Features:
+- Session persistence
+- Cookie handling
+- SSL/TLS verification control
+- Custom headers
+- Timeout management
+
+### WebCrawler (Stub)
+
+Web discovery and crawling:
+
+```python
+from packages.web import WebCrawler
+
+crawler = WebCrawler(client)
+crawl_results = crawler.crawl(base_url)
+
+# Expected output structure:
+{
+    "stats": {
+        "total_pages": 0,
+        "total_parameters": 0,
+        "total_forms": 0
+    },
+    "discovered_parameters": [],
+    "discovered_endpoints": [],
+    "discovered_forms": []
+}
+```
+
+<Warning>
+**Stub Implementation**: The crawler currently returns empty results. Implementation is in progress.
+</Warning>
+
+### WebFuzzer (Stub)
+
+Parameter fuzzing and vulnerability detection:
+
+```python
+from packages.web import WebFuzzer
+
+fuzzer = WebFuzzer(client, llm)
+findings = fuzzer.fuzz_parameter(
+    base_url,
+    parameter,
+    vulnerability_types=['sqli', 'xss', 'command_injection']
+)
+```
+
+<Warning>
+**Stub Implementation**: The fuzzer interface is defined but vulnerability detection logic is not yet implemented.
+</Warning>
+
+## Planned Features
+
+### Phase 1: Discovery (In Progress)
+
+- [ ] **Web Crawling**
+  - [ ] Link extraction and following
+  - [ ] JavaScript rendering (Playwright/Selenium)
+  - [ ] Depth-limited traversal
+  - [ ] Scope boundary enforcement
+  - [ ] Subdomain enumeration
+
+- [ ] **Parameter Discovery**
+  - [ ] Form extraction
+  - [ ] Hidden field detection
+  - [ ] API endpoint discovery
+  - [ ] Query parameter enumeration
+  - [ ] JSON/XML parsing
+
+- [ ] **Authentication**
+  - [ ] Login automation
+  - [ ] Session management
+  - [ ] Multi-step authentication
+  - [ ] OAuth/SAML support
+
+### Phase 2: Fuzzing (Planned)
+
+- [ ] **SQL Injection**
+  - [ ] Error-based detection
+  - [ ] Boolean-based blind
+  - [ ] Time-based blind
+  - [ ] UNION-based extraction
+
+- [ ] **XSS Detection**
+  - [ ] Reflected XSS
+  - [ ] Stored XSS
+  - [ ] DOM-based XSS
+  - [ ] Context-aware payloads
+
+- [ ] **Command Injection**
+  - [ ] OS command injection
+  - [ ] Code injection
+  - [ ] Template injection
+
+- [ ] **Other Vulnerabilities**
+  - [ ] Path traversal
+  - [ ] SSRF
+  - [ ] XXE
+  - [ ] Insecure deserialization
+  - [ ] Open redirect
+
+### Phase 3: Analysis (Planned)
+
+- [ ] **LLM-Guided Testing**
+  - [ ] Context-aware payload generation
+  - [ ] Response analysis
+  - [ ] False positive filtering
+  - [ ] Exploitation path discovery
+
+- [ ] **Reporting**
+  - [ ] Detailed vulnerability reports
+  - [ ] Reproduction steps
+  - [ ] Severity scoring (CVSS)
+  - [ ] Remediation guidance
+
+## CLI Usage
+
+### Basic Scan
+
+```bash
+python3 packages/web/scanner.py --url https://example.com
+```
+
+### Custom Output Directory
+
+```bash
+python3 packages/web/scanner.py \
+  --url http://localhost:3000 \
+  --out /path/to/output
+```
+
+### Crawl Configuration
+
+```bash
+python3 packages/web/scanner.py \
+  --url https://example.com \
+  --max-depth 5 \
+  --max-pages 100
+```
+
+### Skip SSL Verification
+
+<Warning>
+**Security Risk**: Only use `--insecure` for testing against your own servers with self-signed certificates.
+</Warning>
+
+```bash
+python3 packages/web/scanner.py \
+  --url https://localhost:8443 \
+  --insecure
+```
+
+## Output Structure
+
+```
+out/web_scan_1234567890/
+├── crawl_results.json      # Discovery results
+├── web_scan_report.json    # Security findings
+└── logs/
+    └── scan.log
+```
+
+### Crawl Results
+
+```json
+{
+  "stats": {
+    "total_pages": 42,
+    "total_parameters": 156,
+    "total_forms": 12
+  },
+  "discovered_parameters": [
+    {
+      "name": "id",
+      "type": "query",
+      "page": "/user/profile"
+    }
+  ],
+  "discovered_endpoints": [
+    "/api/users",
+    "/api/products"
+  ],
+  "discovered_forms": [
+    {
+      "action": "/login",
+      "method": "POST",
+      "fields": ["username", "password"]
+    }
+  ]
+}
+```
+
+### Security Report
+
+```json
+{
+  "target": "https://example.com",
+  "discovery": {
+    "total_pages": 42,
+    "total_parameters": 156
+  },
+  "findings": [
+    {
+      "type": "sql_injection",
+      "severity": "high",
+      "endpoint": "/api/user",
+      "parameter": "id",
+      "payload": "1' OR '1'='1",
+      "evidence": "SQL error in response",
+      "recommendation": "Use parameterized queries"
+    }
+  ],
+  "total_vulnerabilities": 1
+}
+```
+
+## Integration with RAPTOR
+
+### From Autonomous Mode
+
+Web scanning can be invoked from `/agentic`:
+
+```bash
+# This feature is planned but not yet implemented
+/agentic --web https://example.com
+```
+
+### With Exploitability Validation
+
+Web findings will integrate with the validation pipeline:
+
+```python
+# Planned integration:
+from packages.exploitability_validation import run_validation
+
+run_validation(
+    target_path="https://example.com",
+    findings_file="web_scan_report.json",
+    vuln_type="sql_injection"
+)
+```
+
+## Development Roadmap
+
+### Q1 2026
+
+- ✅ Basic HTTP client (WebClient)
+- ✅ Scanner architecture (WebScanner)
+- 🔄 Web crawler implementation (WebCrawler)
+- 🔄 Parameter discovery
+
+### Q2 2026
+
+- ⏳ Fuzzer implementation (WebFuzzer)
+- ⏳ SQL injection detection
+- ⏳ XSS detection
+- ⏳ LLM-guided payload generation
+
+### Q3 2026
+
+- ⏳ Authentication handling
+- ⏳ Advanced vulnerability types
+- ⏳ JavaScript rendering support
+- ⏳ API testing capabilities
+
+### Q4 2026
+
+- ⏳ Reporting enhancements
+- ⏳ Integration with validation pipeline
+- ⏳ Performance optimization
+- ⏳ Production readiness
+
+**Legend**: ✅ Complete | 🔄 In Progress | ⏳ Planned
+
+## Known Limitations
+
+<Warning>
+The following limitations apply to the current alpha release:
+</Warning>
+
+1. **No Active Scanning**: Fuzzer is not functional
+2. **No Vulnerability Detection**: Detection logic not implemented
+3. **Limited Crawling**: Crawler returns empty results
+4. **No JavaScript Rendering**: Static HTML only
+5. **No Authentication**: Cannot test authenticated pages
+6. **No API Testing**: REST/GraphQL testing not supported
+7. **No Reporting**: Minimal reporting capabilities
+
+## Contributing
+
+The web scanner needs significant development:
+
+1. **Crawler Implementation**
+   - Implement link extraction
+   - Add JavaScript rendering
+   - Handle forms and parameters
+
+2. **Fuzzer Implementation**
+   - Add vulnerability detection logic
+   - Implement payload generation
+   - Add response analysis
+
+3. **Authentication**
+   - Implement login automation
+   - Add session management
+   - Support common auth schemes
+
+4. **Testing**
+   - Add unit tests
+   - Create integration tests
+   - Build test target applications
+
+## Alternative Tools
+
+Until RAPTOR's web scanner is production-ready, consider:
+
+- **Burp Suite** - Industry-standard web app testing
+- **OWASP ZAP** - Open-source security scanner
+- **Nuclei** - Template-based vulnerability scanner
+- **Ffuf** - Fast web fuzzer
+- **SQLMap** - SQL injection testing
+- **XSStrike** - XSS detection
+
+## Experimental Usage
+
+For testing the current implementation:
+
+```python
+import asyncio
+from packages.web import WebScanner, WebClient
+from packages.llm_analysis.llm.client import LLMClient
+
+# Initialize components
+llm = LLMClient()
+scanner = WebScanner(
+    "http://localhost:8080",
+    llm,
+    Path("out/test_scan")
+)
+
+# Run scan (currently returns minimal results)
+results = scanner.scan()
+print(f"Pages found: {results['discovery']['total_pages']}")
+print(f"Vulnerabilities: {results['total_vulnerabilities']}")
+```
+
+<Note>
+Expect empty or minimal results from current implementation.
+</Note>
+
+## See Also
+
+- [Static Analysis](/testing/static-analysis) - Code-level scanning
+- [CodeQL Analysis](/testing/codeql) - Semantic analysis
+- [Binary Fuzzing](/testing/binary-fuzzing) - Binary fuzzing with AFL++
+- [Exploitability Validation](/testing/exploitability-validation) - Finding validation

@@ -1,0 +1,810 @@
+---
+title: Extending RAPTOR
+description: Add custom security scanners, create agents, develop skills, and contribute to the framework
+icon: code-branch
+---
+
+RAPTOR's unified launcher architecture makes it easy to add new security scanning engines, create custom agents, and extend functionality without changing the core workflow.
+
+## Architecture Overview
+
+RAPTOR uses a modular architecture with a unified entry point:
+
+```
+raptor.py (Unified Launcher)
+    ↓
+    ├── Mode Handlers (mode_scan, mode_fuzz, etc.)
+    ↓
+    ├── Package Scripts (packages/*/agent.py)
+    ↓
+    └── Core Utilities (core/config, core/logging, etc.)
+```
+
+### Benefits
+
+<CardGroup cols={2}>
+  <Card title="Single Entry Point" icon="door-open">
+    Users only need `python3 raptor.py <mode>`
+  </Card>
+  <Card title="Consistent Interface" icon="window">
+    All modes follow the same pattern
+  </Card>
+  <Card title="Easy Discovery" icon="magnifying-glass">
+    All modes shown in `--help`
+  </Card>
+  <Card title="Simple Extension" icon="puzzle-piece">
+    Add engines without changing user workflow
+  </Card>
+</CardGroup>
+
+## Adding a New Scanner
+
+Follow these steps to add a custom security scanner:
+
+### Step 1: Create Package Structure
+
+Create a new package in `packages/` with your scanner implementation:
+
+```bash
+mkdir -p packages/my-scanner
+touch packages/my-scanner/__init__.py
+touch packages/my-scanner/agent.py
+touch packages/my-scanner/scanner.py
+```
+
+```
+packages/my-scanner/
+├── __init__.py
+├── agent.py          # Main entry point with CLI
+└── scanner.py        # Core scanning logic (optional)
+```
+
+### Step 2: Implement CLI Interface
+
+Create `agent.py` with a standard argparse CLI:
+
+```python
+#!/usr/bin/env python3
+"""
+My Scanner - Custom security scanner
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+# Add to path for core imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from core.config import RaptorConfig
+from core.logging import get_logger
+
+logger = get_logger()
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="My Scanner - Custom security scanner"
+    )
+    parser.add_argument("--target", required=True, help="Target to scan")
+    parser.add_argument("--out", help="Output directory")
+    
+    args = parser.parse_args()
+    
+    # Your scanning logic here
+    logger.info(f"Scanning {args.target}...")
+    
+    # Return 0 on success
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+```
+
+<Tip>
+Follow existing scanners in `packages/` for more examples.
+</Tip>
+
+### Step 3: Add Mode Handler
+
+Open `raptor.py` and add a new mode handler function:
+
+```python
+def mode_my_scanner(args: list) -> int:
+    """Run my custom scanner."""
+    script_root = Path(__file__).parent
+    scanner_script = script_root / "packages/my-scanner/agent.py"
+    
+    if not scanner_script.exists():
+        print(f"✗ Scanner not found: {scanner_script}")
+        return 1
+    
+    print("\n[*] Running my custom scanner...\n")
+    return run_script(scanner_script, args)
+```
+
+### Step 4: Register Your Mode
+
+In the `main()` function of `raptor.py`, add your mode to `mode_handlers`:
+
+```python
+def main():
+    # ... existing code ...
+    
+    # Route to appropriate mode
+    mode_handlers = {
+        'scan': mode_scan,
+        'fuzz': mode_fuzz,
+        'web': mode_web,
+        'agentic': mode_agentic,
+        'codeql': mode_codeql,
+        'analyze': mode_llm_analysis,
+        'myscan': mode_my_scanner,  # Add your new mode
+    }
+    
+    # ... rest of function ...
+```
+
+### Step 5: Update Help Text
+
+Update the help epilog in `main()` to include your new mode:
+
+```python
+epilog="""
+Available Modes:
+  scan        - Static code analysis with Semgrep
+  fuzz        - Binary fuzzing with AFL++
+  web         - Web application security testing
+  agentic     - Full autonomous workflow
+  codeql      - CodeQL-only analysis
+  analyze     - LLM-powered vulnerability analysis
+  myscan      - My custom security scanner
+
+Examples:
+  # My custom scanner
+  python3 raptor.py myscan --target /path/to/target
+"""
+```
+
+### Step 6: Test Integration
+
+```bash
+# Test help
+python3 raptor.py myscan --help
+
+# Test execution
+python3 raptor.py myscan --target /path/to/target
+
+# Test mode-specific help
+python3 raptor.py help myscan
+```
+
+## Complete Example: Dependency Scanner
+
+Here's a full example of adding a dependency vulnerability scanner:
+
+### Create packages/dependency-scan/agent.py
+
+```python
+#!/usr/bin/env python3
+"""
+Dependency Scanner - Check for vulnerable dependencies
+"""
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from core.config import RaptorConfig
+from core.logging import get_logger
+
+logger = get_logger()
+
+
+def scan_dependencies(repo_path: Path) -> dict:
+    """Scan for dependency vulnerabilities."""
+    logger.info(f"Scanning dependencies in {repo_path}")
+    
+    findings = []
+    
+    # Check requirements.txt
+    req_file = repo_path / "requirements.txt"
+    if req_file.exists():
+        logger.info(f"Found {req_file}")
+        # Parse and check dependencies
+        with open(req_file, 'r') as f:
+            for line in f:
+                pkg = line.strip()
+                if pkg and not pkg.startswith('#'):
+                    # Check vulnerability databases
+                    # (Implementation details omitted)
+                    pass
+    
+    # Check package.json
+    pkg_file = repo_path / "package.json"
+    if pkg_file.exists():
+        logger.info(f"Found {pkg_file}")
+        # Parse and check npm dependencies
+        with open(pkg_file, 'r') as f:
+            data = json.load(f)
+            deps = data.get('dependencies', {})
+            # Check each dependency
+    
+    return {
+        "total_dependencies": 10,
+        "vulnerable_dependencies": 2,
+        "findings": findings
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Dependency Scanner - Check for vulnerable dependencies"
+    )
+    parser.add_argument("--repo", required=True, help="Repository path")
+    parser.add_argument("--out", help="Output directory")
+    
+    args = parser.parse_args()
+    
+    repo_path = Path(args.repo)
+    if not repo_path.exists():
+        print(f"✗ Repository not found: {repo_path}")
+        return 1
+    
+    # Run scan
+    results = scan_dependencies(repo_path)
+    
+    # Save results
+    out_dir = Path(args.out) if args.out else RaptorConfig.get_out_dir() / "dependency-scan"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    
+    output_file = out_dir / "dependency_report.json"
+    with open(output_file, 'w') as f:
+        json.dump(results, f, indent=2)
+    
+    print(f"\n✓ Scan complete")
+    print(f"  Total dependencies: {results['total_dependencies']}")
+    print(f"  Vulnerable: {results['vulnerable_dependencies']}")
+    print(f"  Report: {output_file}")
+    
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+```
+
+### Add to raptor.py
+
+```python
+def mode_depscan(args: list) -> int:
+    """Run dependency vulnerability scanner."""
+    script_root = Path(__file__).parent
+    scanner_script = script_root / "packages/dependency-scan/agent.py"
+    
+    if not scanner_script.exists():
+        print(f"✗ Dependency scanner not found: {scanner_script}")
+        return 1
+    
+    print("\n[*] Scanning for vulnerable dependencies...\n")
+    return run_script(scanner_script, args)
+
+# Add to mode_handlers
+mode_handlers = {
+    # ... existing modes ...
+    'depscan': mode_depscan,
+}
+```
+
+### Usage
+
+```bash
+# Run dependency scan
+python3 raptor.py depscan --repo /path/to/code
+
+# Get help
+python3 raptor.py help depscan
+```
+
+## Creating Custom Agents
+
+RAPTOR supports specialized agents for complex workflows:
+
+### Agent Structure
+
+```python
+#!/usr/bin/env python3
+"""
+Custom Agent - Specialized security analysis
+"""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.config import RaptorConfig
+from core.logging import get_logger
+
+logger = get_logger()
+
+
+class CustomAgent:
+    """
+    Custom agent for specialized analysis.
+    """
+    
+    def __init__(self, config: dict):
+        self.config = config
+        self.results = []
+    
+    def analyze(self, target: Path):
+        """Perform specialized analysis."""
+        logger.info(f"Analyzing {target}...")
+        
+        # Your analysis logic
+        findings = self._scan_target(target)
+        
+        # Process results
+        self.results.extend(findings)
+        
+        return self.results
+    
+    def _scan_target(self, target: Path) -> list:
+        """Internal scanning logic."""
+        # Implementation
+        return []
+    
+    def generate_report(self, output_path: Path):
+        """Generate analysis report."""
+        report = {
+            "findings": self.results,
+            "summary": self._generate_summary()
+        }
+        
+        with open(output_path, 'w') as f:
+            json.dump(report, f, indent=2)
+        
+        return output_path
+    
+    def _generate_summary(self) -> dict:
+        """Generate summary statistics."""
+        return {
+            "total_findings": len(self.results),
+            "by_severity": self._count_by_severity()
+        }
+```
+
+### Example: API Security Agent
+
+```python
+#!/usr/bin/env python3
+"""
+API Security Agent - Specialized API endpoint analysis
+"""
+
+class APISecurityAgent:
+    """
+    Analyzes API endpoints for security issues:
+    - Authentication bypasses
+    - Authorization flaws (IDOR)
+    - Rate limiting gaps
+    - Input validation issues
+    """
+    
+    def __init__(self, config: dict):
+        self.config = config
+        self.endpoints = []
+        self.findings = []
+    
+    def discover_endpoints(self, codebase: Path):
+        """Discover API endpoints in codebase."""
+        # Parse routing files
+        # Extract endpoint definitions
+        # Build endpoint map
+        pass
+    
+    def analyze_authentication(self):
+        """Check authentication on each endpoint."""
+        for endpoint in self.endpoints:
+            if not endpoint.has_auth:
+                self.findings.append({
+                    "type": "missing_authentication",
+                    "endpoint": endpoint.path,
+                    "severity": "high"
+                })
+    
+    def analyze_authorization(self):
+        """Check for IDOR and broken access control."""
+        for endpoint in self.endpoints:
+            if endpoint.uses_user_id and not endpoint.validates_ownership:
+                self.findings.append({
+                    "type": "idor",
+                    "endpoint": endpoint.path,
+                    "severity": "critical"
+                })
+    
+    def analyze_rate_limiting(self):
+        """Check for rate limiting on sensitive endpoints."""
+        sensitive_paths = ['/login', '/register', '/api/token']
+        for endpoint in self.endpoints:
+            if any(path in endpoint.path for path in sensitive_paths):
+                if not endpoint.has_rate_limit:
+                    self.findings.append({
+                        "type": "missing_rate_limit",
+                        "endpoint": endpoint.path,
+                        "severity": "medium"
+                    })
+```
+
+## Developing Skills
+
+Skills are reusable expertise modules that can be loaded on-demand.
+
+<Warning>
+Skill functionality is currently in **alpha**. Definition creation works, but auto-loading and execution integration are not yet fully implemented.
+</Warning>
+
+### Skill Structure
+
+```markdown
+# Skill Name
+# Purpose: Brief description
+# Token cost: ~XXX tokens
+# Triggers: keyword1, keyword2, keyword3
+
+## Context
+
+Provide necessary background and context for this skill.
+
+## Methodology
+
+1. **Step 1:** Description
+2. **Step 2:** Description
+3. **Step 3:** Description
+
+## Examples
+
+Provide concrete examples of applying this skill.
+
+## Decision Framework
+
+Provide clear decision criteria.
+```
+
+### Example: API Authentication Skill
+
+```markdown
+# API Authentication Analysis Skill
+# Purpose: Analyze API authentication mechanisms for security flaws
+# Token cost: ~350 tokens
+# Triggers: API, authentication, auth, bearer token, JWT
+
+## Context
+
+API authentication is critical for security. This skill provides
+systematic analysis of authentication mechanisms.
+
+## Methodology
+
+1. **Identify Authentication Type**
+   - Bearer tokens
+   - API keys
+   - OAuth 2.0
+   - JWT
+   - Basic auth
+
+2. **Check Token Security**
+   - Sufficient entropy?
+   - Proper expiration?
+   - Secure storage?
+   - Transmitted over HTTPS only?
+
+3. **Validate Authorization**
+   - Token validation on every request?
+   - Proper scope checking?
+   - No privilege escalation?
+
+4. **Test Edge Cases**
+   - Expired tokens rejected?
+   - Invalid tokens rejected?
+   - Missing tokens rejected?
+   - Token reuse prevented?
+
+## Examples
+
+### Insecure JWT Implementation
+
+```python
+# Vulnerable: No expiration, no signature verification
+token = jwt.encode({'user_id': user_id}, 'secret')
+```
+
+### Secure JWT Implementation
+
+```python
+# Secure: Expiration, strong algorithm, verified
+token = jwt.encode(
+    {'user_id': user_id, 'exp': datetime.utcnow() + timedelta(hours=1)},
+    os.environ['JWT_SECRET'],
+    algorithm='HS256'
+)
+```
+
+## Decision Framework
+
+**INSECURE if ANY:**
+- No authentication required
+- Weak token generation (predictable)
+- No expiration (tokens valid forever)
+- No signature verification
+- Transmitted over HTTP
+
+**SECURE if ALL:**
+- Strong token generation (crypto random)
+- Short expiration (< 24 hours)
+- Proper signature verification
+- HTTPS only
+- Token validation on every request
+```
+
+### Creating Skills
+
+Use the `/create-skill` command in Claude Code:
+
+```
+User: /create-skill
+
+Claude: What successful approach should we save?
+
+User: When testing APIs, I always check authentication endpoints first,
+      then rate limiting, then input validation. This finds critical
+      issues faster.
+
+Claude: [Extracts patterns]
+        [Validates token budget]
+        
+        Skill: api_security_prioritization
+        Triggers: API, endpoint, REST
+        Size: 380 tokens
+        
+        Create? [Y/n]
+
+User: Y
+
+Claude: ✓ Saved to: tiers/specialists/custom/api_security_prioritization.md
+```
+
+## Best Practices
+
+### Naming Conventions
+
+<AccordionGroup>
+  <Accordion title="Package Names" icon="folder">
+    Use lowercase with hyphens:
+    - `packages/my-scanner/`
+    - `packages/api-analyzer/`
+    - `packages/cloud-audit/`
+  </Accordion>
+  <Accordion title="Mode Names" icon="tag">
+    Use descriptive, lowercase names:
+    - `myscan`, `depscan`, `apiscan`
+    - Avoid generic names like `test` or `check`
+  </Accordion>
+  <Accordion title="Entry Points" icon="door-open">
+    Main entry point should be:
+    - `agent.py` for agent-based scanners
+    - `scanner.py` for tool wrappers
+  </Accordion>
+</AccordionGroup>
+
+### Error Handling
+
+```python
+def mode_my_scanner(args: list) -> int:
+    script_root = Path(__file__).parent
+    scanner_script = script_root / "packages/my-scanner/agent.py"
+    
+    # Check if script exists
+    if not scanner_script.exists():
+        print(f"✗ Scanner not found: {scanner_script}")
+        print(f"  Please ensure packages/my-scanner/agent.py exists")
+        return 1
+    
+    # Check dependencies
+    try:
+        import required_module
+    except ImportError:
+        print(f"✗ Missing dependency: required_module")
+        print(f"  Install with: pip install required_module")
+        return 1
+    
+    print("\n[*] Running my scanner...\n")
+    return run_script(scanner_script, args)
+```
+
+### Using Core Utilities
+
+```python
+from core.config import RaptorConfig  # Configuration management
+from core.logging import get_logger   # Structured logging
+from core.sarif.parser import parse_sarif  # SARIF handling
+
+logger = get_logger()
+
+# Get output directory
+out_dir = RaptorConfig.get_out_dir() / "my-scanner"
+out_dir.mkdir(parents=True, exist_ok=True)
+
+# Use structured logging
+logger.info("Starting scan...")
+logger.warning("Potential issue detected")
+logger.error("Scan failed")
+
+# Parse SARIF files
+findings = parse_sarif(sarif_file)
+```
+
+### Output Conventions
+
+<Steps>
+  <Step title="Save to RAPTOR output directory">
+    ```python
+    out_dir = RaptorConfig.get_out_dir() / "your-scanner-name"
+    ```
+  </Step>
+  <Step title="Use structured formats">
+    JSON, SARIF, or other machine-readable formats
+  </Step>
+  <Step title="Include timestamps">
+    ```python
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = out_dir / f"results_{timestamp}.json"
+    ```
+  </Step>
+  <Step title="Log to audit trail">
+    ```python
+    logger.info(f"Results saved to {output_file}")
+    ```
+  </Step>
+</Steps>
+
+## Testing Your Extension
+
+### Unit Tests
+
+Create tests in `test/`:
+
+```python
+# test/test_my_scanner.py
+import pytest
+from packages.my_scanner.agent import scan_target
+
+def test_basic_scan():
+    result = scan_target("/tmp/test")
+    assert result is not None
+    assert "findings" in result
+
+def test_invalid_target():
+    with pytest.raises(ValueError):
+        scan_target("/nonexistent")
+```
+
+### Integration Tests
+
+```bash
+# Test help
+python3 raptor.py myscan --help
+
+# Test with invalid arguments
+python3 raptor.py myscan
+
+# Test actual execution
+python3 raptor.py myscan --target /tmp/test-target
+
+# Verify output
+ls -la out/myscan_*/
+cat out/myscan_*/results.json
+```
+
+### Verify Output Format
+
+```bash
+# Check SARIF validity
+jq empty out/myscan_*/*.sarif && echo "Valid SARIF"
+
+# Check required fields
+jq '.runs[0].results | length' out/myscan_*/*.sarif
+```
+
+## Contributing
+
+When contributing new scanners or features:
+
+### Pull Request Checklist
+
+- [ ] Scanner implementation in `packages/your-scanner/`
+- [ ] Mode handler in `raptor.py`
+- [ ] Updated help text in `raptor.py`
+- [ ] Documentation in `docs/` (if complex)
+- [ ] Example usage in README.md
+- [ ] Tests in `test/` (if applicable)
+- [ ] Dependencies listed in `requirements.txt`
+- [ ] Error handling implemented
+- [ ] Output follows conventions
+- [ ] Logging uses `get_logger()`
+
+### Documentation Requirements
+
+<CardGroup cols={2}>
+  <Card title="README Section" icon="book">
+    Add usage example to main README.md
+  </Card>
+  <Card title="Help Text" icon="circle-question">
+    Clear description in `raptor.py --help`
+  </Card>
+  <Card title="Docstrings" icon="file-code">
+    Document all public functions
+  </Card>
+  <Card title="Examples" icon="lightbulb">
+    Provide real-world usage examples
+  </Card>
+</CardGroup>
+
+### Code Review Guidelines
+
+1. **Consistent style:** Follow existing code patterns
+2. **Error handling:** Handle edge cases gracefully
+3. **Documentation:** Clear docstrings and comments
+4. **Testing:** Include basic tests
+5. **Dependencies:** Minimize external dependencies
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="Existing Scanners" icon="magnifying-glass">
+    Check `packages/` for examples
+  </Card>
+  <Card title="Architecture Docs" icon="file-lines">
+    Review `docs/ARCHITECTURE.md`
+  </Card>
+  <Card title="GitHub Issues" icon="github">
+    Ask questions on GitHub
+  </Card>
+  <Card title="raptor.py Source" icon="code">
+    Study the routing pattern
+  </Card>
+</CardGroup>
+
+## Summary
+
+Adding new capabilities to RAPTOR:
+
+1. **Create** `packages/my-scanner/agent.py`
+2. **Add** `mode_my_scanner()` function to `raptor.py`
+3. **Register** in `mode_handlers` dictionary
+4. **Update** help text
+5. **Test** integration
+
+The unified launcher makes it easy to expand RAPTOR's capabilities while maintaining a consistent user experience.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Python CLI" icon="terminal" href="/guides/python-cli">
+    Learn command-line usage patterns
+  </Card>
+  <Card title="Creating Personas" icon="user-plus" href="/guides/creating-personas">
+    Develop custom expert personas
+  </Card>
+  <Card title="API Reference" icon="book" href="/reference/api">
+    Core API documentation
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/reference/configuration">
+    Configuration options
+  </Card>
+</CardGroup>

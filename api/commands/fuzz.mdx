@@ -1,0 +1,151 @@
+---
+title: "/fuzz"
+description: "RAPTOR binary fuzzing with AFL++"
+---
+
+## Overview
+
+The `/fuzz` command performs coverage-guided fuzzing on binary executables using AFL++. It's an alias for `/raptor-fuzz` and automatically analyzes crashes to generate exploits.
+
+## Syntax
+
+```bash
+python3 raptor.py fuzz --binary <path> [options]
+```
+
+## Parameters
+
+<ParamField path="binary" type="string" required>
+  Absolute path to the binary executable to fuzz
+</ParamField>
+
+<ParamField path="duration" type="integer">
+  Fuzzing duration in seconds (default: 6600 = 110 minutes)
+</ParamField>
+
+<ParamField path="corpus" type="string">
+  Path to seed corpus directory for initial test cases
+</ParamField>
+
+<ParamField path="max-crashes" type="integer">
+  Maximum number of crashes to collect before stopping
+</ParamField>
+
+## What It Does
+
+1. Configures AFL++ fuzzing environment
+2. Runs coverage-guided fuzzing on the target binary
+3. Detects crashes and hangs
+4. Automatically analyzes crashes with ASAN
+5. Generates exploit PoCs for discovered vulnerabilities
+6. Produces crash analysis reports
+
+## Examples
+
+### Basic Fuzzing (110 minutes)
+
+```bash
+python3 raptor.py fuzz --binary /path/to/binary --duration 6600
+```
+
+Runs standard fuzzing session with default duration.
+
+### Quick Fuzz Test (10 minutes)
+
+```bash
+python3 raptor.py fuzz --binary /path/to/binary --duration 600 --max-crashes 5
+```
+
+Quick fuzzing run that stops after finding 5 crashes.
+
+### With Custom Seed Corpus
+
+```bash
+python3 raptor.py fuzz --binary /path/to/binary --corpus /path/to/seeds --duration 3600
+```
+
+Starts fuzzing with pre-existing test cases for better coverage.
+
+## Prerequisites
+
+### Required Tools
+
+- **AFL++**: Coverage-guided fuzzer
+- **ASAN**: AddressSanitizer for crash detection
+- **GCC/Clang**: Compiler with sanitizer support
+
+### Optimal Binary Compilation
+
+```bash
+# Compile with AFL instrumentation and ASAN
+afl-clang-fast -fsanitize=address -g -o binary source.c
+```
+
+### macOS Configuration
+
+If fuzzing fails with `shmget() failed` error:
+
+```bash
+sudo afl-system-config
+```
+
+## Output Structure
+
+```
+out/fuzz_<binary>_<timestamp>/
+├── afl_output/
+│   └── main/
+│       ├── crashes/       # Crash test cases
+│       ├── hangs/         # Hang test cases
+│       └── queue/         # Corpus queue
+├── crash-analysis/        # Crash reports
+├── exploits/             # Generated PoCs
+└── fuzzing-report.md     # Summary report
+```
+
+## Vulnerability Types Detected
+
+- Buffer overflows
+- Heap corruption
+- Use-after-free
+- Stack overflow
+- Integer overflow
+- Format string bugs
+- Null pointer dereference
+
+## Use Cases
+
+- Binary security auditing
+- Crash discovery and analysis
+- Exploit development
+- Regression testing
+- Memory corruption detection
+
+## Performance Tips
+
+- Compile with AFL instrumentation for better coverage
+- Use ASAN for precise crash detection
+- Provide quality seed corpus for faster results
+- Run for at least 1 hour for meaningful results
+- Use multiple CPU cores with parallel fuzzing
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="/crash-analysis" href="/api/commands/crash-analysis">
+    Deep root-cause analysis of crashes
+  </Card>
+  <Card title="/exploit" href="/api/commands/exploit">
+    Generate exploit PoCs from vulnerabilities
+  </Card>
+  <Card title="/validate" href="/api/commands/validate">
+    Validate exploitability of findings
+  </Card>
+</CardGroup>
+
+## Notes
+
+- Fuzzing can take hours to days for thorough coverage
+- RAPTOR automatically analyzes crashes and generates exploits
+- Binary should ideally be compiled with instrumentation
+- For educational and authorized testing only

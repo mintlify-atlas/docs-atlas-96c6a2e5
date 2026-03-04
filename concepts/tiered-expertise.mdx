@@ -1,0 +1,530 @@
+---
+title: Progressive Expertise System
+description: Load expert personas on-demand to optimize token usage while providing deep security expertise
+---
+
+RAPTOR uses a tiered expertise system that progressively loads specialized knowledge as needed. This approach keeps initial context minimal while providing access to deep domain expertise when required.
+
+## Design Philosophy
+
+The tiered system follows three principles:
+
+1. **Start minimal:** Only core instructions always loaded
+2. **Load on-demand:** Everything else loads when needed
+3. **Defer to Python:** Don't duplicate what Python already does
+
+## Tiers Structure
+
+```
+tiers/
+├── analysis-guidance.md     # Loaded after scan completes
+├── exploit-guidance.md      # Loaded when developing exploits
+├── recovery.md              # Loaded on errors
+├── validation-recovery.md   # Loaded on validation errors
+│
+├── personas/                # Expert methodologies (load on request)
+│   ├── security_researcher.md
+│   ├── exploit_developer.md
+│   ├── crash_analyst.md
+│   ├── binary_exploitation_specialist.md
+│   ├── codeql_analyst.md
+│   ├── codeql_finding_analyst.md
+│   ├── fuzzing_strategist.md
+│   ├── offensive_security_researcher.md
+│   ├── patch_engineer.md
+│   ├── penetration_tester.md
+│   └── README.md
+│
+├── specialists/             # Sub-agents (reserved for future)
+│   └── README.md
+│
+└── reference/              # Deep dives (reserved for future)
+```
+
+## Bootstrap Layer (Always Loaded)
+
+The core instructions in `CLAUDE.md` are always loaded:
+
+**Content:**
+- Session start procedures
+- Command definitions (`/scan`, `/fuzz`, `/analyze`, etc.)
+- Output style guidelines
+- Progressive loading rules
+- Binary analysis flow
+- Exploit development constraints
+
+**Token cost:** ~800 tokens (always loaded)
+
+**Location:** `CLAUDE.md:1`
+
+## Tier 1: Guidance Files (Auto-Loaded)
+
+Guidance files load automatically based on context triggers.
+
+### analysis-guidance.md
+
+**Location:** `tiers/analysis-guidance.md:1`
+
+**When loaded:** After Python scan completes (keywords: "findings", "results", "vulnerabilities")
+
+**Token cost:** ~300 tokens
+
+**Purpose:** Help prioritize findings with adversarial thinking
+
+**Priority framework:**
+
+1. **Secrets/Credentials** (If Found)
+   - Instant compromise risk
+   - No exploitation needed
+   - Examples: AWS keys, GitHub tokens, database passwords
+
+2. **Input Validation Issues** (If Found)
+   - Most common and highly exploitable
+   - Examples: SQL injection, XSS, command injection
+
+3. **Authentication/Authorization** (If Found)
+   - Critical access control failures
+   - Examples: Missing auth checks, broken access control, IDOR
+
+4. **Cryptography Issues** (If Found)
+   - Data protection failures
+   - Examples: Weak algorithms (MD5, SHA1), hardcoded keys
+
+5. **Configuration Issues** (If Found)
+   - Security baseline problems
+   - Examples: Debug mode in production, insecure CORS
+
+**Decision template:**
+
+```
+Results: [N] findings from Python
+
+[Summarize with adversarial priority ordering]
+
+What next?
+1. Deep - Analyze top findings in detail
+2. Fix - Apply patches / review exploits Python generated
+3. Generate report - Summarize and export
+4. Retry - Run Python again with different parameters
+5. Done - Finish
+
+Your choice? [1-5]
+```
+
+### exploit-guidance.md
+
+**When loaded:** When developing exploits (keywords: "exploit", "PoC", "payload")
+
+**Token cost:** ~400 tokens
+
+**Purpose:** Provide exploit development constraints and techniques
+
+**Content:**
+- Constraint verification (ASLR, DEP, stack canaries, CFI)
+- Exploitation path verdicts (Likely, Difficult, Unlikely)
+- Chain break analysis (what won't work)
+- Alternative techniques (what might work)
+- Environment recommendations (Docker, older glibc)
+
+### recovery.md
+
+**Location:** `tiers/recovery.md:1`
+
+**When loaded:** On general errors
+
+**Token cost:** ~250 tokens
+
+**Purpose:** Error recovery protocols and debugging strategies
+
+**Content:**
+- Common error patterns and solutions
+- Debugging workflows
+- Fallback strategies
+- When to ask for human help
+
+### validation-recovery.md
+
+**Location:** `tiers/validation-recovery.md:1`
+
+**When loaded:** On validation stage errors
+
+**Token cost:** ~300 tokens
+
+**Purpose:** Stage-specific recovery for exploitability validation
+
+**Content:**
+- Recovery strategies per validation stage
+- Common validation failures
+- How to proceed when stage fails
+
+## Tier 2: Expert Personas (On-Demand)
+
+Personas provide specialized methodologies extracted from RAPTOR's Python code. They're loaded only when explicitly requested.
+
+### The 9 Expert Personas
+
+#### security_researcher.md
+
+**Location:** `tiers/personas/security_researcher.md:1`
+
+**Named expert:** Elite security researcher
+
+**Token cost:** ~500 tokens
+
+**Purpose:** Deep vulnerability validation, false positive detection
+
+**Analysis framework:**
+
+1. **Source Control Analysis**
+   - Who controls this data source?
+   - Attacker controlled ✅ (Exploitable)
+   - Requires access first 🔶 (Conditional)
+   - Internal only ❌ (False positive)
+
+2. **Sanitizer Effectiveness Analysis**
+   - What does it do? (code-level understanding)
+   - Is it appropriate? (vulnerability type matching)
+   - Can it be bypassed? (common bypass techniques)
+   - Applied to ALL paths? (coverage analysis)
+
+3. **Reachability Analysis**
+   - Authentication checks (public/user/admin)
+   - Authorization checks (missing/IDOR/proper)
+   - Prerequisites (none/account/specific state)
+   - Production deployment (production/test/dead code)
+
+4. **Impact Assessment**
+   - Database access (SQLi): Read/modify/delete/stack queries
+   - Code execution (RCE): Shell/read files/lateral movement
+   - Client-side (XSS): Stored/reflected/session hijacking
+
+**Verdict criteria:**
+- **EXPLOITABLE:** Source attacker-controlled, sanitizers bypassable, reachable in production, significant impact
+- **FALSE POSITIVE:** Source not attacker-controlled, effective sanitizer, unreachable code, framework protection
+- **NEEDS TESTING:** Requires some access, sanitizer unclear, reachability unclear
+
+**Usage:**
+
+```
+"Use security researcher persona to analyze finding #42"
+"Is this SQLi actually exploitable?"
+"Validate if this is a false positive"
+```
+
+#### exploit_developer.md
+
+**Location:** `tiers/personas/exploit_developer.md:1`
+
+**Named expert:** Mark Dowd (prolific exploit developer)
+
+**Token cost:** ~400 tokens
+
+**Purpose:** Generate working exploit proof-of-concepts
+
+**Prime directives:**
+
+1. **Working code ONLY** - Must compile without errors
+2. **Complete and executable** - Include ALL necessary imports
+3. **Language selection** - C/C++ for binary, Python for web, JavaScript for client-side
+4. **Safe for authorized testing** - No destructive payloads
+5. **Realistic and practical** - Actually work against vulnerable code
+6. **Well documented** - Comments explaining each step
+7. **Honest assessment** - If exploit cannot be created, explain why
+
+**Exploit strategy by vulnerability type:**
+
+- **SQL Injection:** Union-based, blind, time-based, stacked queries
+- **XSS:** Alert PoC → Cookie stealer → Full payload
+- **Command Injection:** whoami → Reverse shell → Persistence
+- **Buffer Overflow:** Pattern to find offset → ROP chain → Shellcode
+- **Deserialization:** Craft malicious serialized object
+
+**Quality checklist:**
+- Code compiles/runs without errors
+- All imports included
+- Usage instructions in docstring
+- Prerequisites listed
+- Impact clearly stated
+- Limitations acknowledged
+- Comments explain each step
+- Success/failure clearly indicated
+- Safe for authorized testing
+
+**Usage:**
+
+```
+"Use exploit developer persona to create PoC for SQLi in login.php"
+"Exploit developer: write working exploit for buffer overflow"
+"Generate exploit using Mark Dowd methodology"
+```
+
+#### crash_analyst.md
+
+**Location:** `tiers/personas/crash_analyst.md:1`
+
+**Named expert:** Charlie Miller / Halvar Flake (binary exploitation experts)
+
+**Token cost:** ~450 tokens
+
+**Purpose:** Binary crash analysis, exploitability assessment
+
+**Analysis framework:**
+
+1. **Crash Type Identification**
+   - Signal analysis (SIGSEGV, SIGABRT, SIGFPE, SIGILL)
+   - Address analysis (NULL, controlled, heap)
+
+2. **Register State Analysis**
+   - RIP (Instruction Pointer): Fully controlled? ✅ Exploitable
+   - RSP (Stack Pointer): Points to attacker data? Stack pivot possible
+   - RBP (Base Pointer): Stack frame corruption
+   - RAX/RDX/RCX: Attacker-controlled values?
+
+3. **Exploit Primitives Assessment**
+   - Arbitrary write: Controlled data to controlled address → Critical
+   - Controlled jump: Redirect execution → Critical
+   - Information leak: Read arbitrary memory → High (enables ASLR bypass)
+
+4. **Modern Mitigations Analysis**
+   - ASLR: Need info leak first
+   - DEP/NX: Need ROP chain
+   - Stack canaries: Need canary leak or bypass
+   - PIE: Need leak for code addresses
+   - Fortify Source: May prevent exploit
+
+5. **Attack Scenario Development**
+   - Trigger method (command-line, file input, network)
+   - Exploit primitive (buffer overflow, UAF, format string)
+   - Payload construction (offset, gadgets, ROP chain, shellcode)
+   - Success condition (shell, file created, code executed)
+
+6. **Exploitation Feasibility**
+   - **TRIVIAL:** Direct overflow, no protections
+   - **MODERATE:** ASLR (need leak), DEP (need ROP)
+   - **COMPLEX:** Multiple protections, limited primitive
+   - **INFEASIBLE:** NULL deref only, no control, protections prevent
+
+**Usage:**
+
+```
+"Use crash analyst persona to analyze crash from AFL"
+"Crash analyst: Is SIGSEGV at 0x4141414141 exploitable?"
+"Analyze this buffer overflow with expert methodology"
+```
+
+#### fuzzing_strategist.md
+
+**Location:** `tiers/personas/fuzzing_strategist.md:1`
+
+**Token cost:** ~300 tokens
+
+**Purpose:** AFL++ strategy optimization
+
+**Strategic decisions:**
+
+**Corpus strategy:**
+- File format parsers → Format-specific seeds
+- Network protocols → Valid protocol messages
+- Simple inputs → Random data
+- Complex parsers → Structure-aware generation
+
+**Crash prioritization:**
+1. SIGSEGV with controlled address (exploitable)
+2. Heap corruption signals (potentially exploitable)
+3. Assertion failures (usually not exploitable)
+4. NULL pointer dereferences (rarely exploitable)
+
+**AFL++ parameter tuning:**
+- **Timeout:** Fast (&lt;1ms) → 100ms, Normal (1-10ms) → 1000ms, Slow (>10ms) → 5000ms+
+- **Parallel instances:** 1 core → 1 fuzzer, 4 cores → 3-4 fuzzers, 8+ cores → CPU count - 1
+- **Duration:** Initial test → 10 min, Finding bugs → 1-4 hours, Thorough → 24+ hours
+
+**Decision framework:**
+- **When stuck (no crashes):** Improve corpus, increase timeout, try different mode, generate format-specific seeds
+- **When too many crashes:** Deduplicate by stack hash, prioritize by exploitability, focus on unique types
+
+**Usage:**
+
+```
+"Use fuzzing strategist persona to recommend AFL parameters"
+"Fuzzing strategist: should I increase duration or improve corpus?"
+```
+
+#### patch_engineer.md
+
+**Token cost:** ~400 tokens
+
+**Purpose:** Secure patch creation
+
+**Patch principles:**
+- Fix root cause, not symptoms
+- Preserve functionality
+- No performance regression
+- Follow project coding style
+- Include tests
+
+#### penetration_tester.md
+
+**Token cost:** ~350 tokens
+
+**Purpose:** Penetration testing methodology
+
+**Coverage:**
+- Reconnaissance techniques
+- Exploitation workflow
+- Post-exploitation
+- Report generation
+
+#### binary_exploitation_specialist.md
+
+**Token cost:** ~400 tokens
+
+**Purpose:** Binary exploit generation
+
+**Coverage:**
+- Memory corruption exploitation
+- ROP chain construction
+- Shellcode development
+- ASLR bypass techniques
+
+#### codeql_analyst.md
+
+**Token cost:** ~400 tokens
+
+**Purpose:** CodeQL query development
+
+**Coverage:**
+- Query syntax and patterns
+- Dataflow analysis
+- Taint tracking
+- Custom query creation
+
+#### codeql_finding_analyst.md
+
+**Token cost:** ~350 tokens
+
+**Purpose:** CodeQL finding analysis
+
+**Coverage:**
+- Dataflow path validation
+- False positive detection
+- Exploitability assessment
+- Finding prioritization
+
+#### offensive_security_researcher.md
+
+**Token cost:** ~400 tokens
+
+**Purpose:** General offensive security research
+
+**Coverage:**
+- Vulnerability research
+- 0-day hunting
+- Attack technique development
+- Security tool development
+
+### How to Load Personas
+
+Personas are **NOT auto-loaded**. Invoke explicitly:
+
+```
+"Use [persona name] persona to [task]"
+```
+
+**Examples:**
+
+```
+"Use exploit developer persona to create PoC for finding #42"
+"Use crash analyst persona to analyze this crash"
+"Use security researcher persona to validate if this is a false positive"
+"Use patch engineer persona to create secure fix for this vulnerability"
+```
+
+**What happens:**
+1. Claude loads persona file from `tiers/personas/[name].md`
+2. Applies persona methodology framework
+3. Analyzes using expert criteria
+4. Returns structured verdict/code
+
+## Token Budget
+
+**Current usage:**
+- **Core (CLAUDE.md):** ~800 tokens (always loaded)
+- **Guidance files:** 0 tokens (loaded progressively when needed)
+- **Personas:** 0 tokens (load on explicit request only)
+- **Specialists:** 0 tokens (Python handles, or future custom)
+- **Reference:** 0 tokens (empty, reserved)
+
+**Typical session:**
+- **Initial:** 800 tokens (core only)
+- **After scan:** 800 + 300 = 1,100 tokens (analysis-guidance loaded)
+- **With persona:** 800 + 500 = 1,300 tokens (when requested)
+
+**Capacity remaining:** ~2,200 tokens for future expansion
+
+## Integration with Python
+
+Personas are reference documentation that makes Python's internal methodologies explicit.
+
+**Python already uses these personas internally:**
+- `packages/llm_analysis/agent.py` - Security Researcher + Exploit Developer at `packages/llm_analysis/agent.py:1`
+- `packages/llm_analysis/crash_agent.py` - Crash Analyst at `packages/llm_analysis/crash_agent.py:1`
+- `packages/autonomous/dialogue.py` - Fuzzing Strategist at `packages/autonomous/dialogue.py:1`
+
+**These files make Python's internal methodologies explicit and user-accessible.**
+
+No Python code changes needed - personas are reference documentation only.
+
+## Tier 3: Specialists (Reserved for Future)
+
+The `tiers/specialists/` directory is reserved for custom domain specialists that don't exist in Python.
+
+**Potential future specialists:**
+- API testing approaches
+- Mobile app security
+- Cloud infrastructure patterns
+
+**Currently:** All specialists implemented in Python (`packages/`)
+
+**Check availability:** System can detect Python vs custom specialists
+
+## Tier 4: Reference (Reserved for Future)
+
+The `tiers/reference/` directory is reserved for detailed guides.
+
+**Potential future content:**
+- Complete attack methodologies
+- Tool orchestration examples
+- Failure recovery mappings
+
+**Add when users request deep background knowledge.**
+
+## Progressive Loading Rules
+
+Defined in `CLAUDE.md:1`:
+
+```markdown
+**When scan completes:** Load `tiers/analysis-guidance.md`
+**When validating exploitability:** Load `.claude/skills/exploitability-validation/SKILL.md`
+**When validation errors occur:** Load `tiers/validation-recovery.md`
+**When developing exploits:** Load `tiers/exploit-guidance.md`
+**When errors occur:** Load `tiers/recovery.md`
+**When requested:** Load `tiers/personas/[name].md`
+```
+
+## Benefits of Tiered System
+
+1. **Token efficiency:** Only load what's needed
+2. **Deep expertise:** Full methodologies available on-demand
+3. **Clarity:** Clear separation of core vs specialized knowledge
+4. **Extensibility:** Easy to add new personas or guidance
+5. **User control:** Explicit invocation gives users control
+6. **No duplication:** Leverages existing Python implementations
+
+<Tip>
+When unsure which persona to use, start with `security_researcher` for general analysis, then invoke specialized personas for specific tasks.
+</Tip>
+
+<Note>
+Personas are extracted from RAPTOR's Python code, so they represent battle-tested methodologies already used by the autonomous agents.
+</Note>

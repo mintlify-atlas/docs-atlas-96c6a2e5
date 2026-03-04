@@ -1,0 +1,410 @@
+---
+title: Crash Analysis System
+description: Autonomous root-cause analysis for C/C++ crashes using rr, traces, and coverage
+---
+
+The Crash Analysis system provides autonomous root-cause analysis for security-relevant bug reports in C/C++ projects. It orchestrates multiple specialized agents to reproduce crashes, collect forensic data, and produce validated root-cause hypotheses.
+
+## System Overview
+
+The crash analysis system consists of:
+
+- **crash-analysis-agent**: Main orchestrator
+- **crash-analyzer-agent**: Deep root-cause analysis using rr traces
+- **crash-analyzer-checker-agent**: Validates analysis rigorously
+- **function-trace-generator-agent**: Creates function execution traces
+- **coverage-analysis-generator-agent**: Generates gcov coverage data
+
+## Invocation
+
+```bash
+/crash-analysis <bug-tracker-url> <git-repo-url>
+```
+
+**Example**:
+```bash
+/crash-analysis https://bugs.project.org/issue/123 https://github.com/project/repo
+```
+
+## System Architecture
+
+<Steps>
+  <Step title="Orchestration">
+    crash-analysis-agent coordinates the entire workflow
+  </Step>
+  
+  <Step title="Data Collection">
+    Specialized agents gather execution traces, coverage, and rr recordings
+  </Step>
+  
+  <Step title="Analysis">
+    crash-analyzer-agent produces root-cause hypothesis with empirical evidence
+  </Step>
+  
+  <Step title="Validation">
+    crash-analyzer-checker-agent validates every claim against empirical data
+  </Step>
+  
+  <Step title="Iteration">
+    If rejected, analyzer refines hypothesis based on rebuttal feedback
+  </Step>
+</Steps>
+
+## Main Orchestrator: crash-analysis-agent
+
+### Workflow
+
+<AccordionGroup>
+  <Accordion title="1. Fetch Bug Report">
+    - Use WebFetch to retrieve bug description from tracker URL
+    - Extract bug symptoms, test files, reproduction steps
+    - Parse crash logs and ASAN output if available
+  </Accordion>
+
+  <Accordion title="2. Clone Repository">
+    ```bash
+    git clone <git-repo-url> ./repo-<project-name>
+    ```
+  </Accordion>
+
+  <Accordion title="3. Create Working Directory">
+    ```bash
+    mkdir ./crash-analysis-<timestamp>/
+    # Format: YYYYMMDD_HHMMSS
+    ```
+  </Accordion>
+
+  <Accordion title="4. Understand Build System">
+    - Read README, INSTALL, BUILDING.md
+    - Determine build system type (autotools, CMake, Makefile, meson)
+    - Identify required dependencies
+    - Extract build commands
+  </Accordion>
+
+  <Accordion title="5. Rebuild with Instrumentation">
+    Enable AddressSanitizer and debug symbols:
+    
+    ```bash
+    # Autotools
+    ./configure CC=clang CFLAGS="-fsanitize=address -g" LDFLAGS="-fsanitize=address"
+    
+    # CMake
+    cmake -DCMAKE_C_FLAGS="-fsanitize=address -g" -DCMAKE_BUILD_TYPE=Debug ..
+    
+    # Makefile
+    make CC=clang CFLAGS="-fsanitize=address -g"
+    ```
+  </Accordion>
+
+  <Accordion title="6. Reproduce the Crash">
+    - Download attachments from bug report
+    - Execute reproduction steps
+    - Verify crash occurs with ASAN enabled
+  </Accordion>
+
+  <Accordion title="7. Generate Execution Trace">
+    Invoke function-trace-generator agent:
+    ```bash
+    # Creates <working-dir>/traces/trace_*.log
+    ```
+  </Accordion>
+
+  <Accordion title="8. Generate Coverage Data">
+    Invoke coverage-analyzer agent:
+    ```bash
+    # Creates <working-dir>/gcov/*.gcov
+    ```
+  </Accordion>
+
+  <Accordion title="9. Create RR Recording">
+    ```bash
+    rr record <crashing-command>
+    rr pack <working-dir>/rr-trace
+    ```
+  </Accordion>
+
+  <Accordion title="10. Root-Cause Analysis">
+    Invoke crash-analyzer agent with:
+    - Repository path
+    - Working directory path
+    - Crashing example and build instructions
+    - Bug report details
+    
+    Produces: `root-cause-hypothesis-001.md`
+  </Accordion>
+
+  <Accordion title="11. Validate Analysis">
+    Invoke crash-analyzer-checker agent.
+    
+    If rejected:
+    - Read rebuttal file `root-cause-hypothesis-001-rebuttal.md`
+    - Re-invoke crash-analyzer with feedback
+    - Repeat until validated or max 3 iterations
+  </Accordion>
+
+  <Accordion title="12. Confirm Hypothesis">
+    Write `root-cause-hypothesis-001-confirmed.md` with validated analysis
+  </Accordion>
+
+  <Accordion title="13. Wait for Review">
+    Pause and inform user. Wait for human review before patch generation.
+  </Accordion>
+</AccordionGroup>
+
+## crash-analyzer-agent
+
+### Purpose
+
+Analyze crashes using rr recordings, function traces, and coverage data to produce root-cause analyses.
+
+### Methodology
+
+<Steps>
+  <Step title="Examine Memory Access">
+    Identify how out-of-bounds access arose:
+    - Allocated memory too small
+    - Pointer pushed out of bounds
+    - Memory released and dangling pointer dereferenced
+  </Step>
+  
+  <Step title="Locate Memory Allocation">
+    - Find allocation site
+    - Identify any bounds checking between allocation and access
+  </Step>
+  
+  <Step title="Track Pointers">
+    Track relevant pointers from allocation to invalid access using rr recording and function trace
+  </Step>
+  
+  <Step title="Identify Logic Issues">
+    Find missing/incorrect bounds checks or logic issues leading to dangling pointers
+  </Step>
+</Steps>
+
+### Required Analysis Format
+
+Each step in the pointer chain must include:
+
+```markdown
+### Step N: [Description]
+**Location:** `file.c:line`
+
+**Code:**
+```c
+relevant_code_here();
+```
+
+**RR Verification:**
+```bash
+rr replay rr-trace/program-0
+break file.c:123
+commands
+  printf "variable=%p\n", variable
+  continue
+end
+run
+```
+
+**Actual RR Output:**
+```
+Breakpoint 1, function_name (...) at file.c:123
+variable=0x60e000000100
+```
+```
+
+### Mandatory Self-Check
+
+Before returning, verify document contains:
+
+<Checklist>
+  - [ ] "Actual RR Output:" count >= 3
+  - [ ] "0x" (memory addresses) count >= 5 distinct addresses
+  - [ ] Each pointer modification shows BEFORE and AFTER values
+  - [ ] Mathematical verification: calculated crash address = ASAN reported address
+  - [ ] Code intent clearly stated
+  - [ ] Violated assumption clearly stated
+</Checklist>
+
+## crash-analyzer-checker-agent
+
+### Purpose
+
+Rigorously validate root-cause analysis reports to ensure correctness.
+
+### Mechanical Format Verification
+
+**Performed FIRST before reading content:**
+
+```bash
+# Check 1: Count RR Output Sections (must be >= 3)
+grep -c "Actual RR Output:" root-cause-hypothesis-001.md
+
+# Check 2: Count Memory Addresses (must be >= 5 distinct)
+grep -o "0x[0-9a-fA-F]\{8,\}" root-cause-hypothesis-001.md | sort -u | wc -l
+
+# Check 3: Check for Red Flag Phrases (must be empty)
+grep -E "(expected output|should show|likely|probably|can be verified|ideally)" root-cause-hypothesis-001.md
+
+# Check 4: Verify Format Structure
+# Each step must have: Code + RR Commands + Actual Output
+```
+
+<Warning>
+  If ANY format check fails, IMMEDIATELY REJECT without further analysis.
+</Warning>
+
+### Content Validation
+
+The checker validates:
+
+- Complete chain of events from allocation to faulty dereference
+- Precise allocation location with actual rr output
+- Every pointer modification with actual values at each step
+- Pointer values match between steps (end of one = beginning of next)
+- Source code and assembly match described scenario
+- All functions in chain were actually executed (function trace)
+- All code lines in chain were actually executed (coverage data)
+
+### Rejection Format
+
+```markdown
+# Rejection of Hypothesis 001
+
+## Mechanical Format Check Results
+- [ ] RR Output sections: Found X, Required >= 3 [FAIL/PASS]
+- [ ] Memory addresses: Found X, Required >= 5 [FAIL/PASS]
+- [ ] Red flag phrases: Found X [FAIL if > 0]
+- [ ] Complete steps: Checked N steps [FAIL if any incomplete]
+
+## Specific Deficiencies
+
+### Issue 1: [Category]
+**Problem:** [What is missing]
+**Location:** [Where it should have been]
+**Example:** [Show what SHOULD have been there]
+
+## Required Corrections
+1. [Specific action needed]
+2. [Specific action needed]
+
+## Verdict
+This hypothesis is REJECTED and must be revised.
+```
+
+## function-trace-generator-agent
+
+### Purpose
+
+Generate function-level execution traces for debugging and analysis.
+
+### Workflow
+
+<Steps>
+  <Step title="Build Instrumentation Library">
+    ```bash
+    cd .claude/skills/crash-analysis/function-tracing/
+    gcc -c -fPIC trace_instrument.c -o trace_instrument.o
+    gcc -shared trace_instrument.o -o libtrace.so -ldl -lpthread
+    g++ -O3 -std=c++17 trace_to_perfetto.cpp -o trace_to_perfetto
+    ```
+  </Step>
+  
+  <Step title="Rebuild Target with Instrumentation">
+    Add `-finstrument-functions -g` to CFLAGS and link with libtrace.so
+  </Step>
+  
+  <Step title="Run Crashing Program">
+    ```bash
+    export LD_LIBRARY_PATH=<path-to-libtrace>:$LD_LIBRARY_PATH
+    <crashing-command>
+    # Creates trace_<tid>.log files
+    ```
+  </Step>
+  
+  <Step title="Convert to Perfetto Format">
+    ```bash
+    ./trace_to_perfetto trace_*.log -o traces/trace.json
+    # View at ui.perfetto.dev
+    ```
+  </Step>
+</Steps>
+
+## coverage-analysis-generator-agent
+
+### Purpose
+
+Generate gcov coverage data for code analysis.
+
+### Workflow
+
+<Steps>
+  <Step title="Rebuild with Coverage Flags">
+    Add `--coverage -g` to CFLAGS and LDFLAGS
+  </Step>
+  
+  <Step title="Run Crashing Program">
+    Execution creates .gcda files alongside .gcno files
+  </Step>
+  
+  <Step title="Generate Coverage Reports">
+    ```bash
+    find . -name "*.gcda" -exec dirname {} \; | sort -u | while read dir; do
+      (cd "$dir" && gcov *.gcda)
+    done
+    ```
+  </Step>
+  
+  <Step title="Copy Coverage Files">
+    ```bash
+    find . -name "*.gcov" -exec cp {} gcov/ \;
+    ```
+  </Step>
+</Steps>
+
+## Requirements
+
+- **rr**: Deterministic record-replay debugging
+- **gcc/clang**: With AddressSanitizer support
+- **gdb**: For replay debugging
+- **gcov**: Code coverage tool
+
+## Output Artifacts
+
+```
+.out/crash-analysis-20260304_120000/
+├── traces/
+│   ├── trace_12345.log
+│   └── trace.json (Perfetto format)
+├── gcov/
+│   ├── file1.c.gcov
+│   └── file2.c.gcov
+├── rr-trace/
+│   └── program-0/
+├── root-cause-hypothesis-001.md
+├── root-cause-hypothesis-001-rebuttal.md (if rejected)
+└── root-cause-hypothesis-001-confirmed.md
+```
+
+## Related Agents
+
+<CardGroup cols={2}>
+  <Card title="OffSec Specialist" icon="shield-halved" href="/api/agents/offsec-specialist">
+    Offensive security operations and vulnerability research
+  </Card>
+  
+  <Card title="Exploitability Validator" icon="check-double" href="/api/agents/exploitability-validator">
+    Validate exploitability of findings
+  </Card>
+</CardGroup>
+
+## Related Personas
+
+<CardGroup cols={2}>
+  <Card title="Crash Analyst" icon="microscope" href="/api/personas/crash-analyst">
+    Binary crash analysis methodology
+  </Card>
+  
+  <Card title="Binary Exploitation Specialist" icon="terminal" href="/api/personas/binary-exploitation-specialist">
+    Binary exploit generation from crashes
+  </Card>
+</CardGroup>

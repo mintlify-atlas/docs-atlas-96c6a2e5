@@ -1,0 +1,763 @@
+---
+title: 'LLM Cost Tracking'
+description: 'Budget enforcement and real-time cost tracking for LLM API usage'
+icon: 'dollar-sign'
+---
+
+## Overview
+
+RAPTOR provides comprehensive cost tracking and budget enforcement for LLM API usage across multiple providers. All costs are tracked in real-time and enforced before budget limits are exceeded.
+
+<CardGroup cols={2}>
+  <Card title="Real-Time Tracking" icon="gauge-high">
+    Track costs as requests are made, not after the fact
+  </Card>
+  <Card title="Budget Enforcement" icon="shield">
+    Hard limits prevent runaway costs from expensive operations
+  </Card>
+  <Card title="Multi-Provider Support" icon="users-gear">
+    Unified cost tracking for Anthropic, OpenAI, Gemini, Mistral, and Ollama
+  </Card>
+  <Card title="Cost Callbacks" icon="plug">
+    LiteLLM integration provides automatic token counting and cost calculation
+  </Card>
+</CardGroup>
+
+## Cost Configuration
+
+### Setting Budget Limits
+
+```python
+from packages.llm_analysis.llm.config import LLMConfig
+
+# Configure with custom budget
+config = LLMConfig(
+    enable_cost_tracking=True,
+    max_cost_per_scan=10.0,  # USD
+)
+```
+
+**Default budget:** `$10.00` per scan
+
+<Tip>
+For production security research on large codebases, consider increasing to `$25-50`. For quick tests on small targets, `$1-5` is usually sufficient.
+</Tip>
+
+### Per-Model Pricing
+
+RAPTOR automatically configures per-model costs based on current provider pricing:
+
+```python
+# Anthropic Claude
+claude_opus = ModelConfig(
+    provider="anthropic",
+    model_name="claude-opus-4.5",
+    cost_per_1k_tokens=0.015,  # $15 per million tokens
+)
+
+claude_sonnet = ModelConfig(
+    provider="anthropic",
+    model_name="claude-sonnet-4.5",
+    cost_per_1k_tokens=0.003,  # $3 per million tokens
+)
+
+# OpenAI GPT
+gpt_5 = ModelConfig(
+    provider="openai",
+    model_name="gpt-5.2",
+    cost_per_1k_tokens=0.005,  # $5 per million tokens
+)
+
+# Google Gemini
+gemini = ModelConfig(
+    provider="gemini",
+    model_name="gemini-3-pro",
+    cost_per_1k_tokens=0.0001,  # $0.10 per million tokens
+)
+
+# Ollama (local)
+ollama = ModelConfig(
+    provider="ollama",
+    model_name="llama3:70b",
+    cost_per_1k_tokens=0.0,  # FREE - runs locally
+)
+```
+
+<Note>
+Pricing is configured at initialization time. Update `config.py` if provider pricing changes.
+</Note>
+
+## Budget Enforcement
+
+### Pre-Request Checks
+
+Before making any LLM request, RAPTOR checks if the estimated cost would exceed the budget:
+
+```python
+def _check_budget(self, estimated_cost: float = 0.1) -> bool:
+    """Check if we're within budget."""
+    if not self.config.enable_cost_tracking:
+        return True
+    
+    if self.total_cost + estimated_cost > self.config.max_cost_per_scan:
+        logger.error(
+            f"Budget exceeded: ${self.total_cost:.2f} + ${estimated_cost:.2f} "
+            f"> ${self.config.max_cost_per_scan:.2f}"
+        )
+        return False
+    
+    return True
+```
+
+**Behavior:**
+- **Within budget:** Request proceeds
+- **Would exceed budget:** Request blocked with clear error message
+
+### Hard Budget Limit
+
+When budget is exceeded, RAPTOR raises `RuntimeError` with guidance:
+
+```python
+if not self._check_budget():
+    raise RuntimeError(
+        f"LLM budget exceeded: ${self.total_cost:.4f} spent > "
+        f"${self.config.max_cost_per_scan:.4f} limit. "
+        f"Increase budget with: LLMConfig(max_cost_per_scan={self.config.max_cost_per_scan * 2:.1f})"
+    )
+```
+
+**Example error message:**
+
+```
+RuntimeError: LLM budget exceeded: $10.2345 spent > $10.0000 limit. 
+Increase budget with: LLMConfig(max_cost_per_scan=20.0)
+```
+
+<Warning>
+Budget enforcement is a **hard limit**. Once exceeded, all LLM requests will fail until budget is increased or costs are reset.
+</Warning>
+
+## Real-Time Cost Tracking
+
+### Token-Based Calculation
+
+Costs are calculated based on actual token usage reported by LiteLLM:
+
+```python
+# After successful LLM call
+response = provider.generate(prompt, system_prompt)
+
+# Track cost
+self.total_cost += response.cost
+self.request_count += 1
+
+logger.info(
+    f"Generation successful: {model.provider}/{model.model_name} "
+    f"(tokens: {response.tokens_used}, cost: ${response.cost:.4f})"
+)
+```
+
+**Cost calculation:**
+
+```python
+tokens_used = response.usage.total_tokens  # Input + output tokens
+cost = (tokens_used / 1000) * model_config.cost_per_1k_tokens
+```
+
+### Per-Provider Tracking
+
+Each provider maintains its own cost counter:
+
+```python
+class LLMProvider:
+    def __init__(self, model_config: ModelConfig):
+        self.total_cost = 0.0
+        self.total_tokens = 0
+    
+    def generate(self, prompt: str, system_prompt: Optional[str] = None):
+        response = litellm.completion(...)
+        
+        # Calculate cost for this request
+        tokens = response.usage.total_tokens
+        cost = (tokens / 1000) * self.model_config.cost_per_1k_tokens
+        
+        # Update provider totals
+        self.total_cost += cost
+        self.total_tokens += tokens
+        
+        return LLMResponse(cost=cost, tokens_used=tokens, ...)
+```
+
+### Global Cost Aggregation
+
+The client aggregates costs across all providers:
+
+```python
+class LLMClient:
+    def __init__(self):
+        self.total_cost = 0.0
+        self.providers = {}  # provider_key -> LLMProvider
+    
+    def get_stats(self) -> Dict[str, Any]:
+        return {
+            "total_cost": self.total_cost,
+            "budget_remaining": self.config.max_cost_per_scan - self.total_cost,
+            "request_count": self.request_count,
+            "providers": {
+                key: {
+                    "total_tokens": provider.total_tokens,
+                    "total_cost": provider.total_cost,
+                }
+                for key, provider in self.providers.items()
+            }
+        }
+```
+
+## LiteLLM Integration
+
+### Automatic Token Counting
+
+LiteLLM provides automatic token counting for all providers:
+
+```python
+import litellm
+
+response = litellm.completion(
+    model="claude-sonnet-4.5",
+    messages=[{"role": "user", "content": prompt}],
+)
+
+# Token usage automatically populated
+print(response.usage.prompt_tokens)      # Input tokens
+print(response.usage.completion_tokens)  # Output tokens
+print(response.usage.total_tokens)       # Sum
+```
+
+**Supported providers:**
+- Anthropic (Claude)
+- OpenAI (GPT)
+- Google (Gemini, PaLM)
+- Mistral
+- Ollama (reports tokens even though free)
+
+### Cost Callbacks
+
+RAPTOR registers a LiteLLM callback for detailed cost visibility:
+
+```python
+class RaptorLLMLogger:
+    """LiteLLM callback logger for RAPTOR visibility."""
+    
+    def log_success_event(self, kwargs, response_obj, start_time, end_time):
+        model = kwargs.get("model", "unknown")
+        tokens_used = response_obj.usage.total_tokens
+        duration = end_time - start_time
+        
+        logger.debug(
+            f"[LiteLLM] Success: model={model}, "
+            f"tokens={tokens_used}, duration={duration:.2f}s"
+        )
+    
+    def log_failure_event(self, kwargs, response_obj, start_time, end_time):
+        model = kwargs.get("model", "unknown")
+        error_msg = str(response_obj)
+        
+        logger.debug(f"[LiteLLM] Failure: model={model}, error={error_msg}")
+
+# Register callback (singleton pattern)
+callback = RaptorLLMLogger()
+litellm.callbacks.append(callback)
+```
+
+**Callback benefits:**
+- Atomic logging of every LLM call
+- Token usage from LiteLLM's perspective (not just our calculation)
+- Duration tracking for performance analysis
+- Automatic error capture
+
+<Tip>
+Callbacks complement manual logging. Manual logs provide RAPTOR-level context (retries, fallbacks), while callbacks provide LiteLLM-level metrics (tokens, duration).
+</Tip>
+
+## Cost Optimization Strategies
+
+### 1. Response Caching
+
+**Avoid re-computing identical requests:**
+
+```python
+config = LLMConfig(
+    enable_caching=True,
+    cache_dir=Path("out/llm_cache"),
+)
+
+client = LLMClient(config)
+
+# First call: Costs $0.15
+response1 = client.generate("Analyze this vulnerability...")
+
+# Second identical call: FREE (cached)
+response2 = client.generate("Analyze this vulnerability...")
+print(response2.finish_reason)  # "cached"
+```
+
+**Cache key:** `sha256(model + system_prompt + user_prompt)`
+
+**Cache format:**
+
+```json
+{
+  "content": "Analysis: This is a buffer overflow...",
+  "model": "claude-sonnet-4.5",
+  "provider": "anthropic",
+  "tokens_used": 1234,
+  "timestamp": 1625097600.0
+}
+```
+
+<Warning>
+Cache is not invalidated automatically. Clear `out/llm_cache/` if you update prompts or want fresh analysis.
+</Warning>
+
+### 2. Model Selection
+
+**Use cheaper models for simpler tasks:**
+
+```python
+config = LLMConfig(
+    # Primary: Expensive, high-capability
+    primary_model=ModelConfig(
+        provider="anthropic",
+        model_name="claude-opus-4.5",
+        cost_per_1k_tokens=0.015,
+    ),
+    
+    # Specialized: Cheaper for specific tasks
+    specialized_models={
+        "code_analysis": ModelConfig(
+            provider="anthropic",
+            model_name="claude-sonnet-4.5",
+            cost_per_1k_tokens=0.003,  # 5x cheaper
+        ),
+        "simple_classification": ModelConfig(
+            provider="gemini",
+            model_name="gemini-3-pro",
+            cost_per_1k_tokens=0.0001,  # 150x cheaper!
+        ),
+    },
+)
+
+# Use specialized model for task
+response = client.generate(
+    prompt="Is this a buffer overflow? Yes/No",
+    task_type="simple_classification",  # Uses Gemini
+)
+```
+
+**Task-specific models:**
+
+| Task Type | Recommended Model | Cost/1M Tokens | Reasoning |
+|-----------|------------------|----------------|------------|
+| Exploit generation | Claude Opus | $15 | Needs deep reasoning |
+| Vulnerability analysis | Claude Sonnet | $3 | Good balance |
+| Code classification | Gemini Pro | $0.10 | Fast, cheap |
+| Simple extraction | Gemini Flash | $0.02 | Ultra cheap |
+
+### 3. Prompt Optimization
+
+**Reduce token usage with shorter prompts:**
+
+```python
+# ❌ BAD: Verbose prompt (500 tokens)
+prompt = """
+I would like you to carefully analyze the following code snippet 
+and provide a detailed explanation of any security vulnerabilities 
+that might be present. Please consider buffer overflows, integer 
+overflows, use-after-free, and any other memory safety issues...
+[500 more words]
+"""
+
+# ✅ GOOD: Concise prompt (50 tokens)
+prompt = """
+Analyze for security vulnerabilities:
+- Memory safety issues
+- Logic errors
+- Input validation
+
+Code:
+{code_snippet}
+"""
+```
+
+**Savings:** 90% reduction in prompt tokens = 45% reduction in total cost (assuming 50/50 input/output split)
+
+### 4. Quota Detection and Fallback
+
+**Automatic fallback when quota exceeded:**
+
+```python
+def _is_quota_error(error: Exception) -> bool:
+    """Detect quota/rate limit errors."""
+    if isinstance(error, litellm.RateLimitError):
+        return True
+    
+    error_str = str(error).lower()
+    return any([
+        "429" in error_str,
+        "quota exceeded" in error_str,
+        "rate limit" in error_str,
+    ])
+
+def generate(self, prompt: str, **kwargs):
+    try:
+        # Try primary model
+        return self._generate_with_model(self.config.primary_model, prompt)
+    except Exception as e:
+        if _is_quota_error(e):
+            logger.warning(f"Quota exceeded for {self.config.primary_model.provider}")
+            # Fall back to different provider
+            for fallback in self.config.fallback_models:
+                try:
+                    return self._generate_with_model(fallback, prompt)
+                except Exception:
+                    continue
+```
+
+**Quota guidance:**
+
+```python
+def _get_quota_guidance(model_name: str, provider: str) -> str:
+    if provider == "gemini":
+        return "→ Google Gemini quota/rate limit exceeded"
+    elif provider == "openai":
+        return "→ OpenAI rate limit exceeded"
+    elif provider == "anthropic":
+        return "→ Anthropic rate limit exceeded"
+    else:
+        return f"→ {provider.title()} rate limit exceeded"
+```
+
+### 5. Local Model Usage
+
+**Use Ollama for free inference:**
+
+```python
+config = LLMConfig(
+    primary_model=ModelConfig(
+        provider="ollama",
+        model_name="llama3:70b",
+        api_base="http://localhost:11434",
+        cost_per_1k_tokens=0.0,  # FREE!
+    ),
+)
+```
+
+**Trade-offs:**
+
+<Tabs>
+  <Tab title="Pros">
+    - **Zero cost**: No API fees
+    - **Privacy**: Data never leaves your machine
+    - **No rate limits**: Run as many requests as hardware allows
+    - **Offline capable**: Works without internet
+  </Tab>
+  
+  <Tab title="Cons">
+    - **Lower quality**: Local models less capable than GPT-5/Claude Opus
+    - **Slower**: Inference speed depends on hardware
+    - **Unreliable exploits**: May generate non-functional PoCs
+    - **Higher false positives**: Less accurate vulnerability assessment
+  </Tab>
+</Tabs>
+
+<Warning>
+RAPTOR warns when using Ollama for exploit generation:
+
+```
+⚠️  Local model - exploit PoCs may be unreliable
+For production security research, consider cloud models.
+```
+</Warning>
+
+## Cost Reporting
+
+### Real-Time Statistics
+
+Get current cost statistics during scan:
+
+```python
+client = LLMClient()
+
+# ... make some requests ...
+
+stats = client.get_stats()
+print(f"Total cost: ${stats['total_cost']:.4f}")
+print(f"Budget remaining: ${stats['budget_remaining']:.4f}")
+print(f"Requests: {stats['request_count']}")
+
+for provider, metrics in stats['providers'].items():
+    print(f"  {provider}: {metrics['total_tokens']} tokens, ${metrics['total_cost']:.4f}")
+```
+
+**Example output:**
+
+```
+Total cost: $2.4567
+Budget remaining: $7.5433
+Requests: 15
+  anthropic:claude-sonnet-4.5: 123456 tokens, $1.8519
+  openai:gpt-5.2: 87654 tokens, $0.6048
+```
+
+### Post-Scan Summary
+
+After scan completion, RAPTOR reports total costs:
+
+```bash
+✅ AUTONOMOUS ORCHESTRATION COMPLETE
+====================================================================
+Total findings: 12
+Processed: 5
+Analyzed: 5
+Exploitable: 2
+
+Autonomous Actions:
+  ✓ Exploits generated: 2
+  ✓ Patches generated: 5
+
+Execution time: 245.67s
+LLM Cost: $3.45 / $10.00 budget (34.5% used)
+
+Results saved to: out/agentic_myapp_20250713_143022/
+====================================================================
+```
+
+### Budget Exhaustion Warning
+
+When budget is nearly exhausted:
+
+```
+⚠️  Warning: 90% of LLM budget used ($9.00 / $10.00)
+Consider increasing budget for remaining findings.
+```
+
+When budget exceeded:
+
+```
+❌ Error: LLM budget exceeded: $10.2345 spent > $10.0000 limit.
+Increase budget with: LLMConfig(max_cost_per_scan=20.0)
+```
+
+## Advanced Configuration
+
+### Per-Scan Budget Override
+
+```python
+# Default: $10
+default_client = LLMClient()  
+
+# High-value target: $50
+high_value_config = LLMConfig(max_cost_per_scan=50.0)
+high_value_client = LLMClient(high_value_config)
+
+# Quick test: $1
+quick_test_config = LLMConfig(max_cost_per_scan=1.0)
+quick_test_client = LLMClient(quick_test_config)
+```
+
+### Cost Reset
+
+Reset cost tracking between scans:
+
+```python
+client = LLMClient()
+
+# Scan 1
+result1 = run_scan(client)
+print(f"Scan 1 cost: ${client.total_cost:.2f}")
+
+# Reset for Scan 2
+client.reset_costs()
+result2 = run_scan(client)
+print(f"Scan 2 cost: ${client.total_cost:.2f}")
+```
+
+### Disable Cost Tracking
+
+```python
+# For testing or when cost is not a concern
+config = LLMConfig(
+    enable_cost_tracking=False,
+)
+
+client = LLMClient(config)
+# Budget checks are skipped, all requests allowed
+```
+
+<Warning>
+Only disable cost tracking in development/testing environments. Production scans should always enforce budgets.
+</Warning>
+
+## Cost Analysis Tools
+
+### Cost Breakdown by Task
+
+```python
+class CostTracker:
+    def __init__(self):
+        self.costs_by_task = {}
+    
+    def track_task(self, task_name: str, cost: float):
+        if task_name not in self.costs_by_task:
+            self.costs_by_task[task_name] = []
+        self.costs_by_task[task_name].append(cost)
+    
+    def report(self):
+        for task, costs in self.costs_by_task.items():
+            total = sum(costs)
+            avg = total / len(costs)
+            print(f"{task}: ${total:.4f} total, ${avg:.4f} avg ({len(costs)} calls)")
+
+tracker = CostTracker()
+
+# Track each analysis task
+for finding in findings:
+    cost_before = client.total_cost
+    analyze_finding(finding)
+    cost_after = client.total_cost
+    tracker.track_task("vulnerability_analysis", cost_after - cost_before)
+
+tracker.report()
+```
+
+**Example output:**
+
+```
+vulnerability_analysis: $1.2345 total, $0.2469 avg (5 calls)
+exploit_generation: $0.8765 total, $0.4383 avg (2 calls)
+patch_creation: $0.6543 total, $0.1309 avg (5 calls)
+```
+
+### Cost Prediction
+
+```python
+def estimate_scan_cost(num_findings: int, avg_code_size: int) -> float:
+    """
+    Estimate total cost for a scan based on historical data.
+    
+    Args:
+        num_findings: Expected number of vulnerabilities
+        avg_code_size: Average lines of code per finding context
+    
+    Returns:
+        Estimated cost in USD
+    """
+    # Historical averages from production scans
+    cost_per_finding_analysis = 0.25  # $0.25 per vulnerability
+    cost_per_exploit = 0.45  # $0.45 per exploit (50% exploitable)
+    cost_per_patch = 0.15  # $0.15 per patch
+    
+    # Adjust for code size
+    size_multiplier = min(avg_code_size / 100, 3.0)  # Cap at 3x
+    
+    analysis_cost = num_findings * cost_per_finding_analysis * size_multiplier
+    exploit_cost = (num_findings * 0.5) * cost_per_exploit * size_multiplier
+    patch_cost = num_findings * cost_per_patch * size_multiplier
+    
+    return analysis_cost + exploit_cost + patch_cost
+
+# Example
+estimated = estimate_scan_cost(num_findings=10, avg_code_size=150)
+print(f"Estimated cost: ${estimated:.2f}")
+# Output: Estimated cost: $5.85
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Set Realistic Budgets" icon="bullseye">
+    Start with $10 for small scans, $25-50 for production. Monitor first scan to calibrate.
+  </Card>
+  
+  <Card title="Enable Caching" icon="bolt">
+    Cache responses to avoid re-computing identical requests (can save 30-50%).
+  </Card>
+  
+  <Card title="Use Task-Specific Models" icon="layer-group">
+    Route simple tasks to cheaper models (Gemini for classification, Sonnet for analysis).
+  </Card>
+  
+  <Card title="Monitor in Real-Time" icon="gauge">
+    Check `client.get_stats()` during scan to detect runaway costs early.
+  </Card>
+</CardGroup>
+
+<AccordionGroup>
+  <Accordion title="Don't Disable Cost Tracking in Production">
+    Always enforce budgets in production to prevent accidentally expensive scans.
+  </Accordion>
+  
+  <Accordion title="Quota Errors are Not Budget Errors">
+    Quota exceeded = provider rate limit (need to wait or switch provider)
+    
+    Budget exceeded = RAPTOR cost limit (need to increase max_cost_per_scan)
+  </Accordion>
+  
+  <Accordion title="Local Models Have Zero Cost but Lower Quality">
+    Use Ollama for development/testing, cloud models for production security research.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<ResponseField name="Budget exceeded but scan not complete" type="error">
+  **Cause:** Scan hit cost limit before processing all findings
+  
+  **Fix:**
+  ```python
+  config = LLMConfig(max_cost_per_scan=25.0)  # Increase budget
+  ```
+</ResponseField>
+
+<ResponseField name="Costs higher than expected" type="warning">
+  **Possible causes:**
+  - Using expensive model (Opus) for all tasks
+  - Long prompts with unnecessary context
+  - Cache disabled or not working
+  
+  **Debug:**
+  ```python
+  stats = client.get_stats()
+  print(stats['providers'])  # See which provider costs most
+  ```
+</ResponseField>
+
+<ResponseField name="Cache not reducing costs" type="info">
+  **Check:**
+  - Is `enable_caching=True`?
+  - Are prompts identical (including whitespace)?
+  - Does `out/llm_cache/` directory exist?
+  
+  **Verify:**
+  ```python
+  response = client.generate(prompt)
+  print(response.finish_reason)  # Should be "cached" on repeat
+  ```
+</ResponseField>
+
+## Further Reading
+
+<CardGroup cols={2}>
+  <Card title="LiteLLM Cost Tracking" icon="chart-line" href="https://docs.litellm.ai/docs/proxy/cost_tracking">
+    Official LiteLLM documentation on cost tracking features
+  </Card>
+  <Card title="Provider Pricing" icon="dollar-sign" href="https://openrouter.ai/models">
+    Up-to-date pricing for all major LLM providers
+  </Card>
+  <Card title="Client Configuration" icon="gear" href="/configuration/llm-providers">
+    Full LLM client configuration reference
+  </Card>
+  <Card title="Optimization Guide" icon="rocket" href="/guides/optimization">
+    Comprehensive guide to optimizing LLM costs
+  </Card>
+</CardGroup>

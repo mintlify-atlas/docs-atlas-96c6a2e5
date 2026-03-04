@@ -1,0 +1,337 @@
+---
+title: "/crash-analysis"
+description: "Autonomous crash root-cause analysis with deterministic replay"
+---
+
+## Overview
+
+The `/crash-analysis` command provides autonomous root-cause analysis for C/C++ crashes. It uses deterministic record-replay debugging (rr), function tracing, and coverage analysis to identify the exact cause of security bugs.
+
+## Syntax
+
+```bash
+/crash-analysis <bug-tracker-url> <git-repo-url>
+```
+
+## Parameters
+
+<ParamField path="bug-tracker-url" type="string" required>
+  URL to the bug tracker report (e.g., Trac, GitHub Issues, Bugzilla)
+</ParamField>
+
+<ParamField path="git-repo-url" type="string" required>
+  URL to the Git repository containing the vulnerable code
+</ParamField>
+
+## What It Does
+
+1. **Fetches bug report** from the provided URL
+2. **Clones repository** from Git URL
+3. **Reads README** to determine build process
+4. **Rebuilds with instrumentation** (AddressSanitizer + debug symbols)
+5. **Reproduces the crash** using inputs from bug report
+6. **Generates execution traces** with function-level granularity
+7. **Collects coverage data** using gcov
+8. **Records with rr** for deterministic replay
+9. **Performs root-cause analysis** with validation loop
+10. **Produces confirmed hypothesis** with evidence
+
+## Workflow Agents
+
+The crash analysis workflow orchestrates multiple specialized agents:
+
+### Main Orchestrator
+
+- **crash-analysis-agent**: Coordinates the entire workflow
+
+### Analysis Agents
+
+- **crash-analyzer-agent**: Performs deep root-cause analysis using rr traces
+- **crash-analyzer-checker-agent**: Validates analysis rigorously
+
+### Data Collection Agents
+
+- **function-trace-generator-agent**: Creates function execution traces
+- **coverage-analysis-generator-agent**: Generates gcov coverage data
+
+## Examples
+
+### Analyze FFmpeg Crash
+
+```bash
+/crash-analysis https://trac.ffmpeg.org/ticket/11234 https://github.com/FFmpeg/FFmpeg.git
+```
+
+Analyzes a reported crash in FFmpeg.
+
+### Analyze ImageMagick Vulnerability
+
+```bash
+/crash-analysis https://github.com/ImageMagick/ImageMagick/issues/5678 https://github.com/ImageMagick/ImageMagick.git
+```
+
+Investigates a security bug in ImageMagick.
+
+### Analyze OpenSSL Issue
+
+```bash
+/crash-analysis https://github.com/openssl/openssl/issues/9012 https://github.com/openssl/openssl.git
+```
+
+Analyzes a reported issue in OpenSSL.
+
+## Prerequisites
+
+### Required Tools
+
+<ParamField path="rr" type="tool" required>
+  Record-replay debugger for deterministic debugging
+  
+  ```bash
+  apt install rr  # Debian/Ubuntu
+  # or build from source: https://github.com/rr-debugger/rr
+  ```
+</ParamField>
+
+<ParamField path="gcc/clang" type="tool" required>
+  Compiler with AddressSanitizer support
+  
+  ```bash
+  apt install gcc g++ clang
+  ```
+</ParamField>
+
+<ParamField path="gdb" type="tool" required>
+  GNU Debugger for debugging rr traces
+  
+  ```bash
+  apt install gdb
+  ```
+</ParamField>
+
+<ParamField path="gcov" type="tool" required>
+  Code coverage tool (bundled with gcc)
+  
+  ```bash
+  # Usually installed with gcc
+  apt install gcc
+  ```
+</ParamField>
+
+## Analysis Features
+
+### Deterministic Replay with rr
+
+rr records program execution and allows perfect replay:
+
+```bash
+# Record the crash
+rr record ./vulnerable_program < crash_input
+
+# Replay infinitely many times
+rr replay
+```
+
+Benefits:
+
+- Exact reproduction of crash every time
+- Reverse execution to find root cause
+- No Heisenbugs (observer effect eliminated)
+- Shareable traces for collaboration
+
+### Function Tracing
+
+Instruments code to log all function calls:
+
+```bash
+# Compile with instrumentation
+gcc -finstrument-functions program.c -o program
+
+# Generate trace
+./program > trace.json
+```
+
+Visualize in Perfetto for execution flow analysis.
+
+### Coverage Analysis
+
+Collects line-level coverage data:
+
+```bash
+# Compile with coverage
+gcc --coverage program.c -o program
+
+# Run and collect coverage
+./program
+gcov program.c
+```
+
+Identifies which lines executed during crash.
+
+### Hypothesis-Validation Loop
+
+The analysis follows a rigorous validation process:
+
+1. **Analyzer forms hypothesis** about root cause
+2. **Checker validates hypothesis** against evidence
+3. **If rejected**, analyzer revises with feedback
+4. **If confirmed**, produces final report
+
+This ensures high-quality, evidence-backed analysis.
+
+## Output Structure
+
+```
+./crash-analysis-<timestamp>/
+├── rr-trace/                        # Deterministic replay recording
+│   └── (shareable for debugging)
+├── traces/                          # Function execution traces
+│   ├── trace.json
+│   └── trace.perfetto              # Visualize in Perfetto
+├── gcov/                            # Code coverage data
+│   ├── program.c.gcov
+│   └── coverage-summary.txt
+├── root-cause-hypothesis-v1.md      # Initial analysis
+├── root-cause-hypothesis-v2.md      # Revised analysis (if needed)
+├── root-cause-hypothesis-confirmed.md  # Final validated analysis
+└── crash-analysis-report.md         # Human-readable summary
+```
+
+## Root Cause Report Format
+
+```markdown
+# Root Cause Analysis: CVE-2024-XXXX
+
+## Summary
+Heap buffer overflow in image parsing function.
+
+## Vulnerability Details
+**Type**: Heap Buffer Overflow  
+**Location**: src/image.c:142  
+**Function**: `parse_image_header()`  
+**CWE**: CWE-787 (Out-of-bounds Write)
+
+## Root Cause
+The function allocates a fixed-size buffer but reads user-controlled
+size from file header without validation.
+
+```c
+char *buffer = malloc(1024);  // Fixed size
+size_t len = read_size_from_header(file);  // Attacker controlled
+memcpy(buffer, data, len);  // No bounds check!
+```
+
+## Attack Vector
+1. Attacker creates malicious image with header size > 1024
+2. Application reads size: 4096 bytes
+3. memcpy writes beyond buffer bounds
+4. Heap corruption occurs
+
+## Evidence
+- **rr trace**: Crash at memcpy+0x42
+- **ASAN report**: Heap-buffer-overflow write
+- **Coverage**: Line 142 executed
+- **Function trace**: parse_image_header called from main
+
+## Impact
+- Remote code execution via heap corruption
+- Denial of service via crash
+- Information disclosure via memory leaks
+
+## Recommendations
+1. Validate size from header: `if (len > 1024) return ERROR;`
+2. Use safe memory functions: `memcpy_s(buffer, sizeof(buffer), data, len)`
+3. Add fuzzing to test suite
+4. Enable ASAN in CI/CD pipeline
+```
+
+## Use Cases
+
+- Security bug analysis
+- Crash debugging for complex applications
+- Root cause identification for CVEs
+- Exploit development research
+- Fuzzing campaign analysis
+- Bug bounty investigation
+
+## Advanced Features
+
+### Shareable rr Traces
+
+rr traces can be packaged and shared:
+
+```bash
+# Package trace
+tar czf crash-trace.tar.gz crash-analysis-*/rr-trace/
+
+# Share with team or security researchers
+# Recipients can replay exact crash
+```
+
+### Reverse Execution
+
+Step backwards through program execution:
+
+```bash
+rr replay
+(rr) reverse-continue  # Run backwards to previous breakpoint
+(rr) reverse-step      # Step backwards
+(rr) reverse-next      # Step over backwards
+```
+
+### Integration with Fuzzing
+
+Combine with `/fuzz` for comprehensive analysis:
+
+```bash
+# 1. Fuzz the binary
+/fuzz /path/to/binary --duration 3600
+
+# 2. Analyze crash
+/crash-analysis <bug-url> <repo-url>
+```
+
+## Workflow Integration
+
+```
+/fuzz -> /crash-analysis -> /exploit
+   |            |              |
+   v            v              v
+ Find        Understand     Develop
+ crashes     root cause     exploits
+```
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="/fuzz" href="/api/commands/fuzz">
+    Find crashes through fuzzing
+  </Card>
+  <Card title="/exploit" href="/api/commands/exploit">
+    Generate exploits from analysis
+  </Card>
+  <Card title="/validate" href="/api/commands/validate">
+    Validate exploitability
+  </Card>
+  <Card title="/patch" href="/api/commands/patch">
+    Generate fixes for vulnerabilities
+  </Card>
+</CardGroup>
+
+## Skills Referenced
+
+The crash analysis workflow uses skills from `.claude/skills/crash-analysis/`:
+
+- **rr-debugger**: Deterministic record-replay debugging
+- **function-tracing**: Function instrumentation with -finstrument-functions
+- **gcov-coverage**: Code coverage collection
+- **line-execution-checker**: Fast line execution queries
+
+## Notes
+
+- Requires Linux (rr only supports Linux)
+- Works best with C/C++ applications
+- rr traces can be large (hundreds of MBs)
+- Analysis follows hypothesis-validation loop for accuracy
+- Produces shareable, reproducible crash traces
+- For security research and authorized testing only

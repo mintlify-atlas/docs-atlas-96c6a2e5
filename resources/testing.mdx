@@ -1,0 +1,626 @@
+---
+title: Testing
+description: Test suite documentation, running tests, and test data examples
+---
+
+## Overview
+
+RAPTOR includes a comprehensive test suite to validate all commands, workflows, and user scenarios. Tests cover command structure, security analysis modes, package architecture, and real vulnerability detection.
+
+<Info>
+  Tests use real vulnerable code samples to ensure RAPTOR's detection capabilities work in practice.
+</Info>
+
+---
+
+## Quick Start
+
+<CodeGroup>
+```bash Run All Tests
+cd raptor
+bash test/comprehensive_test.sh
+```
+
+```bash Run Specific Test Suite
+# Fast tests (no external tool dependencies)
+bash test/real_tests_fast.sh
+
+# Integration tests (requires tools)
+bash test/integration_tests.sh
+
+# Workflow tests (end-to-end)
+bash test/test_workflows.sh
+```
+</CodeGroup>
+
+<Check>
+  **Expected duration:** 2-3 minutes for full suite
+</Check>
+
+---
+
+## Test Structure
+
+RAPTOR's test suite is organized into multiple categories:
+
+### Test Categories
+
+<AccordionGroup>
+  <Accordion title="1. Command Structure Tests">
+    Validates that all RAPTOR commands are properly registered and accessible.
+    
+    **Tests:**
+    - Main launcher recognizes all modes (scan, fuzz, web, agentic, codeql)
+    - Core execution scripts exist (raptor_agentic.py, raptor_fuzzing.py, etc.)
+    - Main scripts have valid Python syntax
+    - Help information is accessible
+    
+    **Example:**
+    ```bash
+    python3 raptor.py --help
+    # Should list: scan, fuzz, web, agentic, codeql
+    ```
+  </Accordion>
+  
+  <Accordion title="2. Scan Mode Tests">
+    Validates static analysis capabilities.
+    
+    **Tests:**
+    - Scan mode help available
+    - Scan requires --repo argument
+    - Scan supports policy groups
+    
+    **Example:**
+    ```bash
+    python3 raptor.py scan --repo /test/data
+    ```
+  </Accordion>
+  
+  <Accordion title="3. Agentic Mode Tests">
+    Validates autonomous workflow capabilities.
+    
+    **Tests:**
+    - Agentic script exists
+    - Agentic accepts arguments
+    - CodeQL integration available
+    - Exploit/patch generation controls present
+    
+    **Example:**
+    ```bash
+    python3 raptor.py agentic --repo /test/data --skip-exploits
+    ```
+  </Accordion>
+  
+  <Accordion title="4. Fuzzing Mode Tests">
+    Validates binary fuzzing capabilities.
+    
+    **Tests:**
+    - Fuzzing script exists
+    - Requires --binary argument
+    - Supports --duration option
+    - Supports --parallel option
+    - Supports autonomous mode
+    
+    **Example:**
+    ```bash
+    python3 raptor.py fuzz --binary ./target --duration 3600
+    ```
+  </Accordion>
+  
+  <Accordion title="5. CodeQL Mode Tests">
+    Validates deep semantic analysis.
+    
+    **Tests:**
+    - CodeQL script exists
+    - CodeQL accepts arguments
+    - Language detection supported
+    
+    **Example:**
+    ```bash
+    python3 raptor.py codeql --repo /test/data --language python
+    ```
+  </Accordion>
+  
+  <Accordion title="6. Web Mode Tests">
+    Validates web application security testing (alpha).
+    
+    **Tests:**
+    - Web mode script exists
+    - Web mode listed in help
+    
+    **Note:** Web mode is in alpha stage.
+  </Accordion>
+  
+  <Accordion title="7. Package Architecture Tests">
+    Validates internal package structure.
+    
+    **Tests:**
+    - Core modules directory exists
+    - Packages directory exists
+    - LLM analysis package exists
+    - Static analysis package exists
+    - Fuzzing utilities exist
+  </Accordion>
+  
+  <Accordion title="8. Test Fixture Tests">
+    Validates that test data samples are present and contain real vulnerabilities.
+    
+    **Tests:**
+    - Test data directory exists
+    - Sample Python vulnerable code present
+    - Sample JavaScript vulnerable code present
+    - Code samples contain vulnerability patterns
+  </Accordion>
+  
+  <Accordion title="9. Workflow Availability Tests">
+    Validates that all user-facing workflows are accessible.
+    
+    **Tests:**
+    - scan --help accessible
+    - agentic --help accessible
+    - fuzz --help accessible
+    - codeql --help accessible
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Test Data Examples
+
+RAPTOR includes realistic vulnerable code samples for testing:
+
+### Python SQL Injection
+
+<CodeGroup>
+```python test/data/python_sql_injection.py
+import sqlite3
+from flask import Flask, request
+
+app = Flask(__name__)
+
+# VULNERABLE: SQL injection in database query
+@app.route('/user/<user_id>')
+def get_user(user_id):
+    db = sqlite3.connect(':memory:')
+    cursor = db.cursor()
+    
+    # Direct string concatenation - SQL injection vulnerability
+    query = "SELECT * FROM users WHERE id = " + user_id
+    cursor.execute(query)
+    
+    return cursor.fetchone()
+
+# VULNERABLE: Hardcoded credentials
+DATABASE_PASSWORD = "admin123!SuperSecret"
+
+# VULNERABLE: Weak cryptography (MD5)
+import hashlib
+def hash_password(password):
+    return hashlib.md5(password.encode()).hexdigest()
+
+# VULNERABLE: Command injection
+import subprocess
+@app.route('/convert', methods=['POST'])
+def convert_file():
+    filename = request.form.get('filename')
+    result = subprocess.run(f"convert {filename} output.jpg", shell=True)
+    return "Conversion complete"
+
+# VULNERABLE: Path traversal
+@app.route('/download/<file_path>')
+def download_file(file_path):
+    with open(f"/var/www/files/{file_path}", "rb") as f:
+        return f.read()
+```
+</CodeGroup>
+
+**Vulnerabilities in this file:**
+- SQL injection (string concatenation)
+- Hardcoded credentials
+- Weak cryptography (MD5)
+- Command injection (shell=True)
+- Path traversal (unsanitized file path)
+
+### JavaScript XSS
+
+<CodeGroup>
+```javascript test/data/javascript_xss.js
+// VULNERABLE: DOM-based XSS
+function displayUserInput() {
+    const userInput = document.getElementById('user_input').value;
+    // Direct innerHTML assignment - XSS vulnerability
+    document.getElementById('output').innerHTML = userInput;
+}
+
+// VULNERABLE: Reflected XSS via query parameter
+function handleSearchQuery() {
+    const query = new URLSearchParams(window.location.search).get('q');
+    // Unsanitized query in HTML - reflected XSS
+    document.write('<p>Search results for: ' + query + '</p>');
+}
+
+// VULNERABLE: Eval usage
+function executeUserCode(code) {
+    // eval() is extremely dangerous - arbitrary code execution
+    eval(code);
+}
+
+// VULNERABLE: Hardcoded API key
+const API_KEY = "sk-1234567890abcdef";
+const SECRET_TOKEN = "super_secret_token_12345";
+
+// VULNERABLE: Insecure localStorage usage
+function storeUserCredentials(username, password) {
+    // Storing sensitive data in localStorage - insecure
+    localStorage.setItem('username', username);
+    localStorage.setItem('password', password);
+}
+
+// VULNERABLE: Insecure random number generation
+function generateSessionToken() {
+    // Math.random() is not cryptographically secure
+    return Math.random().toString(36).substring(7);
+}
+
+// VULNERABLE: Prototype pollution
+function mergeObjects(target, source) {
+    for (const key in source) {
+        // No validation - allows prototype pollution
+        target[key] = source[key];
+    }
+    return target;
+}
+
+// VULNERABLE: Regular expression DoS
+function validateEmail(email) {
+    // Inefficient regex - ReDoS vulnerability
+    const pattern = /^([a-zA-Z0-9]+)*@([a-zA-Z0-9]+)*\.([a-zA-Z0-9]+)*$/;
+    return pattern.test(email);
+}
+```
+</CodeGroup>
+
+**Vulnerabilities in this file:**
+- DOM-based XSS (innerHTML)
+- Reflected XSS (document.write)
+- Arbitrary code execution (eval)
+- Hardcoded secrets (API keys)
+- Insecure storage (localStorage)
+- Weak random generation (Math.random)
+- Prototype pollution
+- ReDoS (inefficient regex)
+
+---
+
+## Running Tests
+
+### Comprehensive Test Suite
+
+Run all tests with detailed output:
+
+<CodeGroup>
+```bash Run Comprehensive Tests
+cd raptor
+bash test/comprehensive_test.sh
+```
+</CodeGroup>
+
+**Output format:**
+```
+╔═══════════════════════════════════════════════════════════╗
+║          RAPTOR Comprehensive Test Suite                  ║
+║     Testing actual workflows, commands, and scenarios     ║
+╚═══════════════════════════════════════════════════════════╝
+
+1. COMMAND STRUCTURE TESTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✓ Main launcher lists all modes
+✓ Core execution scripts exist
+✓ Main scripts have valid Python syntax
+✓ Help information accessible
+
+2. SCAN MODE TESTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✓ Scan mode help available
+✓ Scan requires --repo argument
+...
+
+╔═══════════════════════════════════════════════════════════╗
+║ SUMMARY
+╚═══════════════════════════════════════════════════════════╝
+
+Passed:  42
+Failed:  0
+Skipped: 3
+Total:   45
+
+Compliance: 93% (42/45 tests passed)
+
+✓ All tests passed!
+```
+
+### Test Result Indicators
+
+- ✓ **PASS** - Test succeeded
+- ✗ **FAIL** - Test failed (with error message)
+- ⊘ **SKIP** - Test skipped (with reason)
+
+---
+
+## Test Workflows (Claude Code)
+
+RAPTOR includes a `/test-workflows` command for Claude Code:
+
+<CodeGroup>
+```bash Via Claude Code
+claude
+# Then in Claude:
+/test-workflows
+```
+</CodeGroup>
+
+**What it tests:**
+1. Basic scan (findings only, no exploits)
+2. Full agentic workflow (scan + exploit + patch)
+3. Binary fuzzing
+4. Manual crash validation
+5. Tool routing sanity checks
+
+**Output:** Pass/Fail/Skip status with summary counts
+
+---
+
+## Integration Tests
+
+Integration tests verify RAPTOR works with external tools:
+
+<CodeGroup>
+```bash Run Integration Tests
+bash test/integration_tests.sh
+```
+</CodeGroup>
+
+**Requirements:**
+- Semgrep installed
+- CodeQL installed (optional)
+- AFL++ installed (optional)
+- Test data present
+
+**Tests:**
+- Semgrep scanning works
+- CodeQL database creation (if available)
+- AFL++ fuzzing setup (if available)
+- Python package imports
+
+---
+
+## User Stories
+
+Tests are designed around real user scenarios:
+
+<Steps>
+  <Step title="User Story 1: Quick Scan">
+    **As a developer, I want to quickly scan my code for vulnerabilities.**
+    
+    ```bash
+    python3 raptor.py scan --repo ./myapp
+    ```
+    
+    **Tested by:** Scan mode tests, fixture tests
+  </Step>
+  
+  <Step title="User Story 2: Autonomous Analysis">
+    **As a security researcher, I want RAPTOR to autonomously analyze, generate exploits, and propose patches.**
+    
+    ```bash
+    python3 raptor.py agentic --repo ./myapp
+    ```
+    
+    **Tested by:** Agentic mode tests, workflow tests
+  </Step>
+  
+  <Step title="User Story 3: Binary Fuzzing">
+    **As a bug hunter, I want to fuzz a binary and analyze crashes.**
+    
+    ```bash
+    python3 raptor.py fuzz --binary ./target --duration 3600
+    ```
+    
+    **Tested by:** Fuzzing mode tests, integration tests
+  </Step>
+  
+  <Step title="User Story 4: Deep Analysis">
+    **As an analyst, I want to use CodeQL for deep semantic analysis.**
+    
+    ```bash
+    python3 raptor.py codeql --repo ./myapp
+    ```
+    
+    **Tested by:** CodeQL mode tests, integration tests
+  </Step>
+  
+  <Step title="User Story 5: Custom Workflows">
+    **As a power user, I want to verify RAPTOR works after I make changes.**
+    
+    ```bash
+    bash test/comprehensive_test.sh
+    ```
+    
+    **Tested by:** All test suites
+  </Step>
+</Steps>
+
+---
+
+## Writing New Tests
+
+To add tests to the suite:
+
+<Steps>
+  <Step title="Choose Test Category">
+    Determine which test file to modify:
+    - `comprehensive_test.sh` - Core functionality
+    - `integration_tests.sh` - External tool integration
+    - `test_workflows.sh` - End-to-end workflows
+  </Step>
+  
+  <Step title="Add Test Function">
+    ```bash
+    # Add test in appropriate section
+    if [condition]; then
+        test_result "Your test name" "PASS"
+    else
+        test_result "Your test name" "FAIL" "Error message"
+    fi
+    ```
+  </Step>
+  
+  <Step title="Add Test Data (if needed)">
+    Create new vulnerable code samples in `test/data/`:
+    ```python
+    # test/data/your_vuln.py
+    # VULNERABLE: Description
+    def vulnerable_function():
+        # ... vulnerable code ...
+    ```
+  </Step>
+  
+  <Step title="Run and Verify">
+    ```bash
+    bash test/comprehensive_test.sh
+    ```
+    
+    Ensure your new test passes and doesn't break existing tests.
+  </Step>
+</Steps>
+
+---
+
+## Continuous Integration
+
+<Info>
+  RAPTOR uses GitHub Actions for CI. Tests run automatically on pull requests.
+</Info>
+
+**CI Workflow:**
+1. Install dependencies
+2. Run syntax validation
+3. Run comprehensive test suite
+4. Run integration tests (if tools available)
+5. Report results
+
+**Badge:** [![Tests](https://github.com/gadievron/raptor/actions/workflows/test.yml/badge.svg)](https://github.com/gadievron/raptor/actions)
+
+---
+
+## Troubleshooting Tests
+
+<AccordionGroup>
+  <Accordion title="Tests fail with 'command not found'">
+    **Problem:** Required tools not installed.
+    
+    **Solution:**
+    1. Use the devcontainer (all tools pre-installed)
+    2. Or install missing tools:
+    ```bash
+    pip install semgrep
+    # Install other tools as needed
+    ```
+  </Accordion>
+  
+  <Accordion title="Tests skip with 'May require valid parameters'">
+    **Problem:** Test requires actual execution, skipped for safety.
+    
+    **Solution:** This is normal. Skipped tests indicate optional features or safety guards.
+  </Accordion>
+  
+  <Accordion title="Integration tests fail">
+    **Problem:** External tools not working.
+    
+    **Solution:**
+    1. Verify tool installation:
+    ```bash
+    semgrep --version
+    codeql version
+    ```
+    2. Check test/data directory exists
+    3. Ensure PYTHONPATH is set correctly
+  </Accordion>
+  
+  <Accordion title="Fixture tests fail with 'vulnerability patterns not found'">
+    **Problem:** Test data files modified or missing.
+    
+    **Solution:**
+    1. Restore test/data files from git:
+    ```bash
+    git checkout test/data/
+    ```
+    2. Ensure files contain documented vulnerabilities
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Test Coverage
+
+RAPTOR's test suite covers:
+
+<CardGroup cols={2}>
+  <Card title="Command Coverage" icon="terminal">
+    All major commands:
+    - /scan
+    - /agentic
+    - /fuzz
+    - /codeql
+    - /web
+    - /analyze
+  </Card>
+  
+  <Card title="Vulnerability Coverage" icon="bug">
+    Multiple vulnerability types:
+    - SQL injection
+    - XSS (DOM, reflected)
+    - Command injection
+    - Path traversal
+    - Secrets exposure
+    - Weak cryptography
+  </Card>
+  
+  <Card title="Language Coverage" icon="code">
+    Multiple languages:
+    - Python
+    - JavaScript
+    - C/C++ (via binaries)
+  </Card>
+  
+  <Card title="Package Coverage" icon="box">
+    All packages:
+    - llm_analysis
+    - static-analysis
+    - fuzzing
+    - codeql
+    - web
+  </Card>
+</CardGroup>
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="DevContainer" icon="container-storage" href="/resources/devcontainer">
+    Set up pre-configured environment
+  </Card>
+  
+  <Card title="Contributing" icon="code-pull-request" href="/resources/contributing">
+    Add your own tests
+  </Card>
+  
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Start using RAPTOR
+  </Card>
+  
+  <Card title="FAQ" icon="circle-question" href="/resources/faq">
+    Common questions
+  </Card>
+</CardGroup>

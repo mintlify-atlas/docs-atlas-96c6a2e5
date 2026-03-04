@@ -1,0 +1,462 @@
+---
+title: "Fuzzing"
+description: "AFL++ fuzzing orchestration with parallel workers and intelligent crash collection"
+icon: "bug"
+---
+
+## Overview
+
+The Fuzzing package provides AFL++ orchestration for discovering vulnerabilities through intelligent mutation-based fuzzing. It manages fuzzing campaigns, collects crashes, and integrates with crash analysis.
+
+## Purpose
+
+Automate fuzzing campaigns with:
+- **AFL++ integration**: Industry-standard coverage-guided fuzzing
+- **Parallel workers**: Multiple fuzzer instances for speed
+- **Corpus management**: Smart seed generation and management
+- **Crash collection**: Automatic deduplication and triage
+- **Binary instrumentation detection**: ASAN and AFL instrumentation checks
+
+## Architecture
+
+```python
+packages/fuzzing/
+├── afl_runner.py          # AFL++ campaign orchestration
+├── crash_collector.py     # Crash collection & deduplication
+└── corpus_manager.py      # Corpus generation & management
+```
+
+## Quick Start
+
+### Basic Fuzzing
+
+```python
+from pathlib import Path
+from packages.fuzzing import AFLRunner
+
+# Initialize AFL runner
+runner = AFLRunner(
+    binary_path=Path("/path/to/target_binary"),
+    corpus_dir=Path("seeds/"),
+    output_dir=Path("out/fuzz_results")
+)
+
+# Check instrumentation
+is_instrumented = runner.check_binary_instrumentation()
+
+# Start fuzzing (60 seconds)
+result = runner.run_single_fuzzer(
+    duration_seconds=60,
+    memory_limit="500M"
+)
+
+print(f"Execs: {result['total_execs']}")
+print(f"Crashes: {result['unique_crashes']}")
+```
+
+### Parallel Fuzzing
+
+```python
+# Run with multiple workers
+result = runner.run_parallel_fuzzers(
+    num_workers=4,
+    duration_seconds=300,
+    memory_limit="500M"
+)
+
+print(f"Workers: {len(result['worker_stats'])}")
+print(f"Total crashes: {result['total_unique_crashes']}")
+```
+
+### Crash Collection
+
+```python
+from packages.fuzzing import CrashCollector
+
+collector = CrashCollector(
+    binary_path=Path("/path/to/target"),
+    output_dir=Path("out/crashes")
+)
+
+# Collect crashes from AFL output
+crashes = collector.collect_crashes(
+    afl_output_dir=Path("out/fuzz_results")
+)
+
+for crash in crashes:
+    print(f"Crash ID: {crash.crash_id}")
+    print(f"Signal: {crash.signal}")
+    print(f"Hash: {crash.stack_hash}")
+    print(f"Input: {crash.input_file}")
+```
+
+## Core Classes
+
+### AFLRunner
+
+Orchestrates AFL++ fuzzing campaigns.
+
+```python
+class AFLRunner:
+    def __init__(
+        self,
+        binary_path: Path,
+        corpus_dir: Optional[Path] = None,
+        output_dir: Optional[Path] = None,
+        dict_path: Optional[Path] = None,
+        input_mode: str = "stdin",
+        check_sanitizers: bool = False,
+        recompile_guide: bool = False,
+        use_showmap: bool = False
+    )
+    
+    def run_single_fuzzer(
+        self,
+        duration_seconds: int,
+        memory_limit: str = "none",
+        extra_args: List[str] = None
+    ) -> Dict[str, Any]
+    
+    def run_parallel_fuzzers(
+        self,
+        num_workers: int,
+        duration_seconds: int,
+        memory_limit: str = "none"
+    ) -> Dict[str, Any]
+    
+    def check_binary_instrumentation(self) -> bool
+```
+
+<ParamField path="binary_path" type="Path" required>
+  Path to target binary
+</ParamField>
+
+<ParamField path="corpus_dir" type="Optional[Path]">
+  Seed corpus directory (auto-generated if None)
+</ParamField>
+
+<ParamField path="output_dir" type="Optional[Path]">
+  Output directory for fuzzing results
+</ParamField>
+
+<ParamField path="dict_path" type="Optional[Path]">
+  AFL dictionary file for smarter mutations
+</ParamField>
+
+<ParamField path="input_mode" type="str" default="stdin">
+  Input mode: "stdin", "file", or "network"
+</ParamField>
+
+### CrashCollector
+
+Collects and deduplicates crashes.
+
+```python
+class CrashCollector:
+    def __init__(
+        self,
+        binary_path: Path,
+        output_dir: Path
+    )
+    
+    def collect_crashes(
+        self,
+        afl_output_dir: Path
+    ) -> List[Crash]
+    
+    def deduplicate_crashes(
+        self,
+        crashes: List[Crash]
+    ) -> List[Crash]
+    
+    def triage_crash(
+        self,
+        crash: Crash
+    ) -> Dict[str, Any]
+```
+
+### Crash
+
+Represents a single crash.
+
+<ResponseField name="crash_id" type="str">
+  Unique crash identifier
+</ResponseField>
+
+<ResponseField name="signal" type="str">
+  Signal that caused crash (SIGSEGV, SIGABRT, etc.)
+</ResponseField>
+
+<ResponseField name="stack_hash" type="str">
+  Hash of stack trace for deduplication
+</ResponseField>
+
+<ResponseField name="input_file" type="Path">
+  Path to crashing input
+</ResponseField>
+
+<ResponseField name="exploitability" type="str">
+  Exploitability estimate (exploitable, likely, unlikely, unknown)
+</ResponseField>
+
+### CorpusManager
+
+Manages fuzzing corpus.
+
+```python
+class CorpusManager:
+    def __init__(self, corpus_dir: Path)
+    
+    def generate_seeds(
+        self,
+        num_seeds: int = 10,
+        seed_type: str = "random"
+    ) -> List[Path]
+    
+    def import_corpus(
+        self,
+        source_dir: Path
+    ) -> int
+    
+    def minimize_corpus(
+        self,
+        afl_cmin: str = "afl-cmin"
+    ) -> int
+```
+
+## Fuzzing Workflow
+
+### Complete Campaign
+
+```python
+from pathlib import Path
+from packages.fuzzing import AFLRunner, CrashCollector, CorpusManager
+from packages.binary_analysis import CrashAnalyser
+
+# 1. Prepare corpus
+corpus = CorpusManager(Path("seeds/"))
+corpus.generate_seeds(num_seeds=20, seed_type="mixed")
+
+# 2. Run fuzzing campaign
+runner = AFLRunner(
+    binary_path=Path("target_binary"),
+    corpus_dir=Path("seeds/"),
+    output_dir=Path("out/fuzz")
+)
+
+print("Starting fuzzing campaign...")
+result = runner.run_parallel_fuzzers(
+    num_workers=4,
+    duration_seconds=3600,  # 1 hour
+    memory_limit="1G"
+)
+
+print(f"Campaign complete: {result['total_execs']:,} execs")
+print(f"Found {result['total_unique_crashes']} unique crashes")
+
+# 3. Collect crashes
+collector = CrashCollector(
+    binary_path=Path("target_binary"),
+    output_dir=Path("out/crashes")
+)
+
+crashes = collector.collect_crashes(Path("out/fuzz"))
+print(f"Collected {len(crashes)} crashes")
+
+# 4. Analyze crashes
+analyser = CrashAnalyser(Path("target_binary"))
+
+for crash in crashes[:5]:  # Top 5 crashes
+    context = analyser.analyze_crash(
+        input_file=crash.input_file,
+        signal=crash.signal
+    )
+    print(f"\nCrash {crash.crash_id}:")
+    print(f"  Type: {context.crash_type}")
+    print(f"  Exploitability: {context.exploitability}")
+```
+
+## Binary Preparation
+
+### AFL Instrumentation
+
+```bash
+# Compile with AFL instrumentation
+export CC=afl-clang-fast
+export CXX=afl-clang-fast++
+
+# Build with ASAN for better crash detection
+export AFL_USE_ASAN=1
+
+./configure && make
+```
+
+### Check Instrumentation
+
+```python
+runner = AFLRunner(binary_path=Path("target"))
+
+if runner.check_binary_instrumentation():
+    print("✓ Binary is instrumented")
+else:
+    print("⚠ Binary not instrumented - will use QEMU mode (slower)")
+```
+
+## Corpus Generation
+
+### Automatic Seeds
+
+```python
+from packages.fuzzing import CorpusManager
+
+corpus = CorpusManager(Path("seeds/"))
+
+# Generate mixed seeds
+seeds = corpus.generate_seeds(
+    num_seeds=20,
+    seed_type="mixed"  # random, structured, or mixed
+)
+
+print(f"Generated {len(seeds)} seed files")
+```
+
+### Import Existing Corpus
+
+```python
+# Import seeds from another source
+count = corpus.import_corpus(Path("/path/to/external/seeds"))
+print(f"Imported {count} seeds")
+```
+
+### Minimize Corpus
+
+```python
+# Remove redundant seeds (keeps only unique coverage)
+remaining = corpus.minimize_corpus()
+print(f"Minimized to {remaining} unique seeds")
+```
+
+## Configuration
+
+### AFL++ Options
+
+```python
+runner = AFLRunner(
+    binary_path=Path("target"),
+    corpus_dir=Path("seeds/"),
+    output_dir=Path("out/fuzz"),
+    dict_path=Path("target.dict"),  # Mutation dictionary
+    input_mode="stdin",              # or "file", "network"
+    check_sanitizers=True,           # Check for ASAN
+    use_showmap=True                 # Verify coverage
+)
+```
+
+### Memory Limits
+
+```python
+# Run with memory limit
+result = runner.run_single_fuzzer(
+    duration_seconds=300,
+    memory_limit="500M"  # Prevent OOM
+)
+```
+
+### System Configuration (macOS)
+
+```bash
+# macOS requires higher shared memory limits
+sudo afl-system-config
+
+# Or manually:
+sudo sysctl kern.sysv.shmmax=8388608
+sudo sysctl kern.sysv.shmall=2048
+```
+
+## Output Structure
+
+```
+out/fuzz_results/
+├── main_node/              # Primary fuzzer
+│   ├── crashes/
+│   │   ├── id:000000,sig:11    # Crash inputs
+│   │   └── id:000001,sig:06
+│   ├── queue/             # Corpus queue
+│   └── fuzzer_stats       # Statistics
+├── secondary_node_01/     # Secondary fuzzers
+├── secondary_node_02/
+└── secondary_node_03/
+
+out/crashes/               # Collected & analyzed crashes
+├── crash_abc123/
+│   ├── input              # Crashing input
+│   ├── stack_trace.txt    # Stack trace
+│   ├── registers.txt      # Register dump
+│   └── analysis.json      # LLM analysis
+└── crash_def456/
+```
+
+## Performance
+
+### Execution Speed
+
+- **Instrumented binary**: 100K-500K execs/sec
+- **QEMU mode (no instrumentation)**: 10K-50K execs/sec
+- **ASAN enabled**: 50K-200K execs/sec (slower but finds more bugs)
+
+### Parallel Speedup
+
+| Workers | Speedup | Notes |
+|---------|---------|-------|
+| 1 | 1x | Baseline |
+| 2 | 1.8x | Good for dual-core |
+| 4 | 3.2x | Optimal for quad-core |
+| 8 | 5.5x | Diminishing returns |
+
+## Integration
+
+### With Binary Analysis
+
+```python
+from packages.fuzzing import AFLRunner, CrashCollector
+from packages.binary_analysis import CrashAnalyser
+
+# Fuzz -> Collect -> Analyze
+runner = AFLRunner(...)
+result = runner.run_parallel_fuzzers(...)
+
+collector = CrashCollector(...)
+crashes = collector.collect_crashes(...)
+
+analyser = CrashAnalyser(...)
+for crash in crashes:
+    analysis = analyser.analyze_crash(...)
+```
+
+### With LLM Analysis
+
+```python
+from packages.llm_analysis import AutonomousSecurityAgentV2
+
+# Analyze crash with AI
+agent = AutonomousSecurityAgentV2(...)
+
+for crash in crashes:
+    context = analyser.analyze_crash(crash.input_file, crash.signal)
+    exploit = agent.generate_exploit_for_crash(context)
+```
+
+## Related Packages
+
+- [Binary Analysis](/api/packages/binary-analysis) - Crash analysis and debugging
+- [Autonomous](/api/packages/autonomous) - Intelligent fuzzing strategies
+- [LLM Analysis](/api/packages/llm-analysis) - AI-powered crash analysis
+
+## Best Practices
+
+1. **Use AFL instrumentation** for maximum speed
+2. **Enable ASAN** to catch more bugs
+3. **Start with good seeds** (real-world inputs)
+4. **Run parallel workers** (num_cpus - 1)
+5. **Monitor fuzzer_stats** for stalls
+6. **Minimize corpus** regularly for efficiency

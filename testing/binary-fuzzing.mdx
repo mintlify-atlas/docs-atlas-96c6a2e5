@@ -1,0 +1,529 @@
+---
+title: 'Binary Fuzzing with AFL++'
+description: 'Automated fuzzing campaigns with parallel workers, crash collection, and LLM-powered crash analysis'
+---
+
+## Overview
+
+RAPTOR integrates AFL++ for intelligent binary fuzzing with automatic crash collection, ranking by exploitability, and autonomous crash analysis powered by LLMs.
+
+## Architecture
+
+```
+packages/fuzzing/
+├── afl_runner.py           # AFL++ orchestration
+├── crash_collector.py      # Crash deduplication & ranking
+├── corpus_manager.py       # Seed corpus generation
+└── __init__.py
+
+raptor_fuzzing.py           # Main fuzzing workflow
+```
+
+## AFL++ Runner
+
+### Basic Fuzzing Campaign
+
+Launch a fuzzing campaign:
+
+```python
+from packages.fuzzing import AFLRunner
+
+runner = AFLRunner(
+    binary_path=Path("/path/to/binary"),
+    corpus_dir=Path("/path/to/seeds"),
+    output_dir=Path("out/fuzz_output")
+)
+
+num_crashes, crashes_dir = runner.run_fuzzing(
+    duration=3600,      # 1 hour
+    parallel_jobs=4,    # 4 AFL instances
+    timeout_ms=1000     # 1 second per execution
+)
+```
+
+### Input Modes
+
+**Stdin mode** (default):
+```python
+runner = AFLRunner(binary_path, input_mode="stdin")
+# AFL pipes input to binary's stdin
+```
+
+**File mode** (uses `@@` placeholder):
+```python
+runner = AFLRunner(binary_path, input_mode="file")
+# AFL replaces @@ with input file path
+# Binary must read from file: ./binary @@
+```
+
+### Instrumentation Detection
+
+AFL++ works best with instrumented binaries:
+
+```python
+is_instrumented = runner.check_binary_instrumentation()
+
+if not is_instrumented:
+    # Falls back to QEMU mode (slower)
+    logger.warning("Using QEMU mode for non-instrumented binary")
+```
+
+### Recompilation Guide
+
+For optimal results, recompile with AFL instrumentation:
+
+```bash
+# C/C++ with AFL-clang
+AFL_CC=afl-clang \
+AFL_CXX=afl-clang++ \
+CC=afl-clang \
+CXX=afl-clang++ \
+CFLAGS='-fsanitize=address -fsanitize=undefined' \
+CXXFLAGS='-fsanitize=address -fsanitize=undefined' \
+make clean && make
+
+# Rust with AFL
+RUSTFLAGS='-fsanitize=address' cargo build --release
+```
+
+### Sanitizer Detection
+
+Check if binary has sanitizers enabled:
+
+```python
+has_sanitizers = runner.check_binary_sanitizers()
+
+if has_sanitizers:
+    # ASAN/UBSAN will catch more bugs
+    logger.info("Binary compiled with sanitizers")
+else:
+    logger.warning("Consider recompiling with -fsanitize=address")
+```
+
+## Parallel Fuzzing
+
+### Worker Configuration
+
+AFL++ supports parallel fuzzing with multiple instances:
+
+```python
+runner.run_fuzzing(
+    duration=3600,
+    parallel_jobs=8,    # 8 parallel fuzzers
+    timeout_ms=1000
+)
+```
+
+### Main + Secondary Architecture
+
+RAPTOR automatically configures the AFL hierarchy:
+
+```
+out/afl_output/
+├── main/               # Main instance (deterministic)
+│   ├── crashes/
+│   ├── queue/
+│   └── fuzzer_stats
+├── secondary1/         # Secondary (random)
+├── secondary2/
+└── secondary3/
+```
+
+### Performance Monitoring
+
+AFL++ statistics are logged during fuzzing:
+
+```python
+stats = runner.get_stats()
+
+print(f"Executions/sec: {stats['execs_per_sec']}")
+print(f"Total execs: {stats['execs_done']}")
+print(f"Paths found: {stats['paths_found']}")
+print(f"Stability: {stats['stability']}%")
+print(f"Coverage: {stats['bitmap_cvg']}%")
+```
+
+## Crash Collection
+
+### Automatic Collection
+
+Crashes are automatically collected and deduplicated:
+
+```python
+from packages.fuzzing import CrashCollector
+
+collector = CrashCollector(crashes_dir)
+crashes = collector.collect_crashes(max_crashes=50)
+
+print(f"Collected {len(crashes)} unique crashes")
+```
+
+### Crash Data Structure
+
+```python
+@dataclass
+class Crash:
+    crash_id: str              # AFL crash ID
+    input_file: Path           # Path to crash input
+    signal: Optional[str]      # Signal number (06, 11, etc.)
+    stack_hash: Optional[str]  # Stack trace hash (for dedup)
+    size: int                  # Input file size
+    timestamp: Optional[float] # When crash was found
+```
+
+### Exploitability Ranking
+
+Crashes are ranked by likely exploitability:
+
+```python
+ranked = collector.rank_crashes_by_exploitability(crashes)
+
+# Ranking by signal:
+# 1. SIGSEGV (11) - Memory access violation
+# 2. SIGABRT (06) - Heap corruption / assertion
+# 3. SIGILL (04)  - Invalid instruction
+# 4. SIGFPE (08)  - Floating point exception
+```
+
+### Signal Names
+
+| Signal | Number | Description | Exploitability |
+|--------|--------|-------------|----------------|
+| SIGSEGV | 11 | Segmentation fault | High |
+| SIGABRT | 06 | Abort (heap corruption) | High |
+| SIGILL | 04 | Illegal instruction | Medium |
+| SIGFPE | 08 | Floating point error | Low |
+| SIGBUS | 07 | Bus error | Medium |
+| SIGTRAP | 05 | Trace/breakpoint | Low |
+
+## Corpus Management
+
+### Default Corpus
+
+If no corpus provided, RAPTOR creates basic seeds:
+
+```python
+# Default seeds:
+seeds = [
+    b"A" * 10,
+    b"test\n",
+    b"\x00\x01\x02\x03",
+    b"GET / HTTP/1.0\r\n\r\n",
+]
+```
+
+### Custom Corpus
+
+Provide domain-specific seeds:
+
+```bash
+mkdir -p corpus/
+echo "valid_input_1" > corpus/seed1
+echo "valid_input_2" > corpus/seed2
+dd if=/dev/urandom of=corpus/seed3 bs=1024 count=1
+
+python3 raptor_fuzzing.py \
+  --binary ./target \
+  --corpus corpus/
+```
+
+### AFL Dictionary
+
+Provide syntax hints for structured inputs:
+
+```bash
+# Create dictionary
+cat > http.dict <<EOF
+kw_GET="GET"
+kw_POST="POST"
+kw_HTTP="HTTP/1.1"
+kw_CONTENT="Content-Length: "
+EOF
+
+python3 raptor_fuzzing.py \
+  --binary ./target \
+  --dict http.dict
+```
+
+## CLI Usage
+
+### Basic Fuzzing
+
+```bash
+python3 raptor_fuzzing.py \
+  --binary /path/to/binary \
+  --duration 3600
+```
+
+### Parallel Fuzzing
+
+```bash
+python3 raptor_fuzzing.py \
+  --binary /path/to/binary \
+  --duration 7200 \
+  --parallel 8
+```
+
+### With Custom Corpus
+
+```bash
+python3 raptor_fuzzing.py \
+  --binary /path/to/binary \
+  --corpus /path/to/seeds/ \
+  --duration 3600
+```
+
+### With Dictionary
+
+```bash
+python3 raptor_fuzzing.py \
+  --binary /path/to/binary \
+  --dict http.dict \
+  --duration 3600
+```
+
+### File Input Mode
+
+```bash
+python3 raptor_fuzzing.py \
+  --binary /path/to/binary \
+  --input-mode file \
+  --duration 3600
+```
+
+### Check Instrumentation
+
+```bash
+python3 raptor_fuzzing.py \
+  --binary /path/to/binary \
+  --check-sanitizers \
+  --recompile-guide
+```
+
+### Coverage Analysis
+
+```bash
+python3 raptor_fuzzing.py \
+  --binary /path/to/binary \
+  --use-showmap \
+  --duration 3600
+```
+
+## Crash Analysis
+
+### Autonomous Analysis Pipeline
+
+RAPTOR automatically analyzes crashes with GDB + LLM:
+
+```python
+from packages.binary_analysis import CrashAnalyser
+from packages.llm_analysis.crash_agent import CrashAnalysisAgent
+
+# Phase 1: Collect crash context with GDB
+crash_analyser = CrashAnalyser(binary_path)
+crash_context = crash_analyser.analyse_crash(
+    crash_id=crash.crash_id,
+    input_file=crash.input_file,
+    signal=crash.signal
+)
+
+# Phase 2: LLM analysis
+llm_agent = CrashAnalysisAgent(binary_path, out_dir)
+if llm_agent.analyse_crash(crash_context):
+    # Phase 3: Generate exploit
+    llm_agent.generate_exploit(crash_context)
+```
+
+### Crash Context
+
+GDB extracts detailed crash information:
+
+```python
+@dataclass
+class CrashContext:
+    crash_id: str
+    signal: str
+    crash_type: str              # buffer_overflow, heap_corruption, etc.
+    function_name: str
+    stack_trace: List[str]
+    registers: Dict[str, str]    # RIP, RSP, RBP, etc.
+    disassembly: str
+    memory_maps: str
+    stack_hash: str              # For deduplication
+    exploitability: str          # exploitable, not_exploitable
+```
+
+### Crash Type Classification
+
+Heuristic classification:
+
+```python
+crash_type = crash_analyser.classify_crash_type(crash_context)
+
+# Classification heuristics:
+# - stack_overflow: Stack-related addresses
+# - heap_overflow: Heap addresses (malloc/free)
+# - format_string: Format string functions
+# - use_after_free: SIGABRT + free()
+# - double_free: SIGABRT + double free detected
+# - null_dereference: Dereference of NULL
+# - segfault: Generic segmentation fault
+```
+
+## Autonomous Mode
+
+### Intelligent Fuzzing
+
+Enable autonomous decision-making:
+
+```bash
+python3 raptor_fuzzing.py \
+  --binary /path/to/binary \
+  --autonomous \
+  --goal "find heap overflow"
+```
+
+### Memory & Learning
+
+Autonomous mode persists knowledge:
+
+```python
+from packages.autonomous import FuzzingMemory
+
+memory = FuzzingMemory()  # Loads ~/.raptor/fuzzing_memory.json
+
+# Record crash patterns
+memory.record_crash_pattern(
+    signal="11",
+    function="parse_header",
+    binary_hash=binary_hash,
+    exploitable=True
+)
+
+# Get best strategy from past campaigns
+best_strategy = memory.get_best_strategy(binary_hash)
+```
+
+### Goal-Directed Fuzzing
+
+Set high-level objectives:
+
+```bash
+python3 raptor_fuzzing.py \
+  --binary /path/to/binary \
+  --autonomous \
+  --goal "target parser code"
+```
+
+The goal planner:
+1. Generates intelligent seeds targeting goal areas
+2. Prioritizes crashes matching goal patterns
+3. Adjusts fuzzing strategy based on progress
+
+### Corpus Generation
+
+Autonomous corpus generation:
+
+```python
+from packages.autonomous import CorpusGenerator
+
+generator = CorpusGenerator(binary_path, memory, goal)
+num_seeds = generator.generate_autonomous_corpus(
+    corpus_dir=out_dir / "autonomous_corpus",
+    max_seeds=30
+)
+```
+
+## Workflow Output
+
+```
+out/fuzz_binary_20260304_123456/
+├── afl_output/
+│   └── main/
+│       ├── crashes/
+│       │   ├── id:000000,sig:11,src:000000...
+│       │   └── id:000001,sig:06,src:000001...
+│       ├── queue/          # Interesting inputs
+│       └── fuzzer_stats    # AFL statistics
+├── analysis/
+│   ├── crash_000000_analysis.json
+│   ├── crash_000001_analysis.json
+│   └── exploits/
+│       ├── crash_000000_exploit.c
+│       └── crash_000000_exploit
+├── fuzzing_report.json     # Campaign summary
+└── autonomous_corpus/      # Generated seeds (if --autonomous)
+```
+
+## Crash Deduplication
+
+Multiple deduplication strategies:
+
+1. **Input hash**: Same input file → duplicate
+2. **Stack hash**: Same stack trace → duplicate
+3. **Signal**: Different signals → unique
+
+```python
+seen_stack_hashes = set()
+skipped_duplicates = 0
+
+for crash in ranked_crashes:
+    if crash.stack_hash in seen_stack_hashes:
+        skipped_duplicates += 1
+        continue
+    seen_stack_hashes.add(crash.stack_hash)
+```
+
+## Best Practices
+
+<Tip>
+**Use parallel fuzzing**: 4-8 parallel instances provide near-linear speedup. Start with `--parallel 4`.
+</Tip>
+
+<Warning>
+**AFL shared memory**: On macOS, AFL requires shared memory configuration. Run `sudo afl-system-config` before fuzzing.
+</Warning>
+
+<Note>
+**Recompile with instrumentation**: Non-instrumented binaries use QEMU mode which is 2-5x slower. Recompile with `afl-clang` for best results.
+</Note>
+
+## Troubleshooting
+
+### AFL Shared Memory Error
+
+On macOS:
+
+```bash
+# Configure shared memory
+sudo afl-system-config
+
+# Or manually:
+sudo sysctl kern.sysv.shmmax=524288000
+sudo sysctl kern.sysv.shmall=131072000
+sudo sysctl kern.sysv.shmseg=48
+```
+
+### No Crashes Found
+
+If fuzzing finds no crashes:
+
+1. Increase duration: `--duration 7200` (2 hours)
+2. Improve corpus: Add valid inputs as seeds
+3. Check timeout: Increase `--timeout 5000` (5 seconds)
+4. Verify binary works: `echo "test" | ./binary`
+
+### Low Execution Speed
+
+If execs/sec is low:
+
+- Reduce timeout: `--timeout 100` (100ms)
+- Use instrumented binary (not QEMU mode)
+- Simplify binary (disable unnecessary checks)
+- Check for blocking I/O
+
+## See Also
+
+- [Static Analysis](/testing/static-analysis) - Pre-fuzzing code scanning
+- [Exploitability Validation](/testing/exploitability-validation) - Validate crashes
+- [Web Scanning](/testing/web-scanning) - Web application fuzzing

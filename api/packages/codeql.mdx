@@ -1,0 +1,410 @@
+---
+title: "CodeQL"
+description: "Autonomous CodeQL security analysis with intelligent caching and multi-language support"
+icon: "code"
+---
+
+## Overview
+
+The CodeQL package provides fully autonomous security analysis using GitHub's CodeQL engine. It automatically detects languages, builds systems, creates cached databases, and executes security queries with zero configuration required.
+
+## Purpose
+
+Automate CodeQL security analysis with:
+- **Auto-detection**: Languages, build systems, and configurations
+- **Database caching**: SHA256-based reuse for unchanged repos
+- **Parallel execution**: Multi-language analysis runs concurrently
+- **10 languages supported**: Java, Python, JavaScript, Go, C/C++, C#, Ruby, Swift, Kotlin
+- **SARIF output**: Standardized vulnerability format
+
+## Architecture
+
+```python
+packages/codeql/
+├── agent.py                # Main orchestrator (CLI)
+├── language_detector.py    # Auto-detect languages
+├── build_detector.py       # Auto-detect build systems
+├── database_manager.py     # Database lifecycle & caching
+└── query_runner.py         # Query execution & SARIF output
+```
+
+## Quick Start
+
+### Fully Autonomous
+
+```bash
+# Auto-detect everything and analyze
+python3 packages/codeql/agent.py --repo /path/to/code
+```
+
+**What happens automatically:**
+1. ✓ Detects languages (Java, Python, JavaScript, etc.)
+2. ✓ Detects build systems (Maven, npm, go modules, etc.)
+3. ✓ Generates build commands
+4. ✓ Creates CodeQL databases (cached)
+5. ✓ Runs security-and-quality suites
+6. ✓ Generates SARIF output
+
+### Specify Languages
+
+```bash
+python3 packages/codeql/agent.py \
+  --repo /path/to/code \
+  --languages java,python
+```
+
+### Custom Build Command
+
+```bash
+export CODEQL_CLI=/path/to/codeql/codeql
+
+python3 packages/codeql/agent.py \
+  --repo /path/to/java-project \
+  --languages java \
+  --build-command "mvn clean compile -DskipTests"
+```
+
+## Python API
+
+### CodeQL Agent
+
+```python
+from pathlib import Path
+from packages.codeql import CodeQLAgent
+
+# Initialize agent
+agent = CodeQLAgent(
+    repo_path=Path("/path/to/code"),
+    codeql_cli="/path/to/codeql"  # Optional, auto-detected
+)
+
+# Run full workflow
+result = agent.run(
+    languages=["java", "python"],  # Optional, auto-detected
+    force_rebuild=False,           # Use cached databases
+    extended=False                 # Use standard security suite
+)
+
+print(f"Success: {result.success}")
+print(f"Total findings: {result.total_findings}")
+print(f"SARIF files: {result.sarif_files}")
+```
+
+### Language Detection
+
+```python
+from packages.codeql import LanguageDetector
+
+detector = LanguageDetector(Path("/path/to/code"))
+languages = detector.detect_languages(min_confidence=0.7)
+
+for lang, info in languages.items():
+    print(f"{lang}: {info.confidence:.2f} confidence")
+    print(f"  Files: {info.file_count}")
+    print(f"  Extensions: {info.extensions_found}")
+    print(f"  Build files: {info.build_files_found}")
+```
+
+### Build System Detection
+
+```python
+from packages.codeql import BuildDetector
+
+detector = BuildDetector(Path("/path/to/code"))
+
+# Detect for specific language
+build_system = detector.detect_build_system("java")
+
+if build_system:
+    print(f"Build system: {build_system.name}")
+    print(f"Build file: {build_system.build_file}")
+    print(f"Command: {build_system.build_command}")
+    print(f"Confidence: {build_system.confidence}")
+```
+
+### Database Manager
+
+```python
+from packages.codeql import DatabaseManager, BuildSystem
+from pathlib import Path
+
+manager = DatabaseManager(
+    db_root=Path("codeql_dbs"),
+    codeql_cli="/path/to/codeql"
+)
+
+# Create database (with caching)
+result = manager.create_database(
+    repo_path=Path("/path/to/code"),
+    language="java",
+    build_system=BuildSystem(
+        name="maven",
+        build_command="mvn clean compile",
+        build_file="pom.xml",
+        confidence=0.95
+    ),
+    force=False  # Use cache if available
+)
+
+if result.success:
+    if result.cached:
+        print(f"Using cached database: {result.database_path}")
+    else:
+        print(f"Created database in {result.duration_seconds:.1f}s")
+```
+
+### Query Runner
+
+```python
+from packages.codeql import QueryRunner
+
+runner = QueryRunner(codeql_cli="/path/to/codeql")
+
+# Run security suite
+result = runner.run_query_suite(
+    database_path=Path("codeql_dbs/repo_hash/java-db"),
+    language="java",
+    suite="security-and-quality",  # or "security-extended"
+    output_dir=Path("out/codeql_results")
+)
+
+print(f"Findings: {result.findings_count}")
+print(f"SARIF: {result.sarif_path}")
+print(f"Duration: {result.duration_seconds:.1f}s")
+```
+
+## Core Classes
+
+### CodeQLAgent
+
+Main orchestrator for autonomous CodeQL workflow.
+
+```python
+class CodeQLAgent:
+    def __init__(
+        self,
+        repo_path: Path,
+        out_dir: Optional[Path] = None,
+        codeql_cli: Optional[str] = None
+    )
+    
+    def run(
+        self,
+        languages: Optional[List[str]] = None,
+        build_commands: Optional[Dict[str, str]] = None,
+        force_rebuild: bool = False,
+        extended: bool = False
+    ) -> CodeQLWorkflowResult
+```
+
+### LanguageDetector
+
+Confidence-based language detection.
+
+```python
+class LanguageDetector:
+    def detect_languages(
+        self,
+        min_confidence: float = 0.7,
+        min_files: int = 3
+    ) -> Dict[str, LanguageInfo]
+    
+    def detect_single_language(
+        self,
+        language: str
+    ) -> Optional[LanguageInfo]
+```
+
+### BuildDetector
+
+Auto-detect build systems and generate commands.
+
+```python
+class BuildDetector:
+    def detect_build_system(
+        self,
+        language: str
+    ) -> Optional[BuildSystem]
+    
+    def generate_build_command(
+        self,
+        language: str,
+        build_system_name: str
+    ) -> str
+```
+
+### DatabaseManager
+
+Manage database lifecycle with caching.
+
+```python
+class DatabaseManager:
+    def create_database(
+        self,
+        repo_path: Path,
+        language: str,
+        build_system: Optional[BuildSystem] = None,
+        force: bool = False
+    ) -> DatabaseResult
+    
+    def create_databases_parallel(
+        self,
+        repo_path: Path,
+        language_configs: Dict[str, Optional[BuildSystem]],
+        force: bool = False
+    ) -> Dict[str, DatabaseResult]
+```
+
+### QueryRunner
+
+Execute CodeQL queries and generate SARIF.
+
+```python
+class QueryRunner:
+    def run_query_suite(
+        self,
+        database_path: Path,
+        language: str,
+        suite: str = "security-and-quality",
+        output_dir: Path = None
+    ) -> QueryResult
+```
+
+## Supported Languages
+
+| Language | Build Systems | Suite |
+|----------|---------------|-------|
+| Java | Maven, Gradle, Ant | `java-security-and-quality.qls` |
+| Python | pip, Poetry, setuptools | `python-security-and-quality.qls` |
+| JavaScript | npm, Yarn, pnpm | `javascript-security-and-quality.qls` |
+| TypeScript | npm, Yarn | `javascript-security-and-quality.qls` |
+| Go | go modules | `go-security-and-quality.qls` |
+| C/C++ | CMake, Make, Meson | `cpp-security-and-quality.qls` |
+| C# | dotnet, MSBuild | `csharp-security-and-quality.qls` |
+| Ruby | Bundler, Rake | `ruby-security-and-quality.qls` |
+| Swift | Swift Package Manager | `swift-security-and-quality.qls` |
+| Kotlin | Gradle | `java-security-and-quality.qls` |
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# CodeQL CLI path (auto-detected if not set)
+export CODEQL_CLI=/path/to/codeql
+
+# Custom queries directory
+export CODEQL_QUERIES=/path/to/codeql-queries
+
+# Output directory
+export RAPTOR_OUT_DIR=/custom/output
+```
+
+### RaptorConfig Settings
+
+In `core/config.py`:
+
+```python
+# Database storage
+CODEQL_DB_DIR = REPO_ROOT / "codeql_dbs"
+
+# Timeouts
+CODEQL_TIMEOUT = 1800              # 30 min (database creation)
+CODEQL_ANALYZE_TIMEOUT = 2400      # 40 min (query execution)
+
+# Resources
+CODEQL_RAM_MB = 8192               # 8GB RAM
+CODEQL_THREADS = 0                 # 0 = use all CPUs
+CODEQL_MAX_PATHS = 4               # Max dataflow paths
+
+# Caching
+CODEQL_DB_CACHE_DAYS = 7           # Keep databases 7 days
+CODEQL_DB_AUTO_CLEANUP = True      # Auto-cleanup old DBs
+
+# Parallel processing
+MAX_CODEQL_WORKERS = 2             # Parallel operations
+```
+
+## Output Structure
+
+```
+out/codeql_{repo}_{timestamp}/
+├── codeql_java.sarif              # Per-language SARIF
+├── codeql_python.sarif
+├── codeql_javascript.sarif
+└── codeql_report.json             # Workflow report
+
+codeql_dbs/
+└── {repo_hash}/                   # Cached databases
+    ├── java-db/
+    ├── java-metadata.json
+    ├── python-db/
+    └── python-metadata.json
+```
+
+### Workflow Report
+
+```json
+{
+  "success": true,
+  "repo_path": "/path/to/code",
+  "timestamp": "2026-03-04T12:00:00Z",
+  "duration_seconds": 347.2,
+  "languages_detected": {
+    "java": {
+      "confidence": 0.92,
+      "file_count": 145,
+      "extensions": [".java"],
+      "build_files": ["pom.xml"]
+    }
+  },
+  "databases_created": {
+    "java": {
+      "success": true,
+      "cached": false,
+      "duration_seconds": 312.5
+    }
+  },
+  "analyses_completed": {
+    "java": {
+      "success": true,
+      "findings_count": 23,
+      "sarif_path": "out/codeql_java.sarif"
+    }
+  },
+  "total_findings": 23,
+  "sarif_files": ["out/codeql_java.sarif"]
+}
+```
+
+## Performance
+
+### Database Creation
+
+- **Small repo** (&lt;1K files): 2-5 minutes
+- **Medium repo** (1K-10K files): 5-15 minutes
+- **Large repo** (10K+ files): 15-30 minutes
+
+### Query Execution
+
+- **Security suite**: 2-10 minutes per language
+- **Extended suite**: 5-20 minutes per language
+
+### Caching Benefits
+
+- **Repeat analysis**: &lt;1 second (database reuse)
+- **Cache hit rate**: ~80% for active development
+
+## Related Packages
+
+- [Static Analysis](/api/packages/static-analysis) - Semgrep scanning
+- [LLM Analysis](/api/packages/llm-analysis) - AI-powered analysis of CodeQL findings
+- [Exploitability Validation](/api/packages/exploitability-validation) - Validate exploitability
+
+## Best Practices
+
+1. **Let auto-detection work** - specify languages only if needed
+2. **Use database caching** - massive speedup for repeat analysis
+3. **Parallel databases** - analyze multi-language repos faster
+4. **Custom build commands** - for complex build systems
+5. **Extended suites** - use for comprehensive security audits

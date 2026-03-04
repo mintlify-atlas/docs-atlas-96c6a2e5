@@ -1,0 +1,550 @@
+---
+title: 'GitHub Forensics'
+description: 'Evidence-backed investigation of GitHub security incidents using tamper-proof data sources'
+icon: 'magnifying-glass'
+---
+
+## Overview
+
+RAPTOR's OSS Forensics system provides evidence-backed investigation of public GitHub repositories through automated evidence collection from multiple tamper-proof sources.
+
+<CardGroup cols={2}>
+  <Card title="Multi-Source Evidence" icon="database">
+    Collect from GH Archive, GitHub API, Wayback Machine, and local git repositories
+  </Card>
+  <Card title="Hypothesis Formation" icon="lightbulb">
+    AI-powered analysis that forms and validates hypotheses based on collected evidence
+  </Card>
+  <Card title="Verification Pipeline" icon="shield-check">
+    All evidence is verified against original sources before inclusion in reports
+  </Card>
+  <Card title="Timeline Reconstruction" icon="clock">
+    Build complete incident timelines with actor attribution and impact assessment
+  </Card>
+</CardGroup>
+
+## Command Usage
+
+```bash
+/oss-forensics "Investigate lkmanka58's activity on aws/aws-toolkit-vscode"
+
+/oss-forensics "Validate claims in this vendor report: https://example.com/report"
+
+/oss-forensics "What happened with the stability tag on aws/aws-toolkit-vscode on July 13, 2025?"
+
+# With custom limits
+/oss-forensics "Investigate the July 13 incident" --max-followups 5 --max-retries 3
+```
+
+### Command Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--max-followups` | 3 | Maximum evidence collection rounds |
+| `--max-retries` | 3 | Maximum hypothesis revision rounds |
+
+## Evidence Sources
+
+### 1. GitHub Archive (GH Archive)
+
+**Tamper-proof event data via BigQuery**
+
+GitHub Archive provides immutable forensic evidence of all public GitHub events since 2011. This is your ground truth for:
+
+- **Actor attribution**: Who performed what actions
+- **Timeline reconstruction**: When events occurred (UTC timestamps)
+- **Deleted content recovery**: Issues, PRs, tags, and branches persist in archive
+- **Automation vs API abuse detection**: Presence/absence of WorkflowRunEvent indicates legitimate workflow vs direct API attack
+
+<Tip>
+Always start with GitHub Archive as your first evidence source. It provides the immutable record that other sources are verified against.
+</Tip>
+
+**Key Event Types:**
+
+```python
+PushEvent          # Commits pushed to repository
+PullRequestEvent   # PR opened/closed/merged
+IssuesEvent        # Issue opened/closed
+CreateEvent        # Branch/tag/repo created
+DeleteEvent        # Branch/tag deleted
+WorkflowRunEvent   # GitHub Actions workflow execution
+```
+
+**Example Query Pattern:**
+
+```sql
+SELECT
+    created_at,
+    actor.login,
+    type,
+    JSON_EXTRACT_SCALAR(payload, '$.action') as action
+FROM `githubarchive.day.20250713`
+WHERE
+    repo.name = 'aws/aws-toolkit-vscode'
+    AND actor.login = 'lkmanka58'
+ORDER BY created_at
+```
+
+<Warning>
+**BigQuery Credentials Required**
+
+Set `GOOGLE_APPLICATION_CREDENTIALS` environment variable:
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+```
+
+See [GitHub Archive skill documentation](https://github.com) for setup instructions.
+</Warning>
+
+### 2. GitHub API
+
+**Live repository data**
+
+- Current commit content and metadata
+- File contents at specific refs
+- Branch and tag information
+- PR and issue details (if not deleted)
+- Fork relationships
+
+**Use Cases:**
+- Retrieve commit content after getting SHA from GH Archive
+- Verify current repository state
+- Cross-reference with archived data
+
+### 3. Wayback Machine
+
+**Recover deleted web content**
+
+- Deleted README files and documentation
+- Issue/PR descriptions and comments (Archive Team prioritizes these)
+- Repository metadata snapshots
+- Wiki pages
+- Release notes
+
+**What CAN be recovered:**
+- README files and repository descriptions
+- Issue titles, bodies, and comments
+- PR conversations (Files Changed tab often unavailable)
+- Commit SHAs from archived commit list pages
+
+**What CANNOT be recovered:**
+- Private repository content
+- Complete git history or clones
+- Content behind authentication
+
+### 4. Local Git Repositories
+
+**Clone and analyze dangling commits**
+
+```python
+from src.collectors import LocalGitCollector
+
+collector = LocalGitCollector("/path/to/cloned/repo")
+
+# Find commits not reachable from any ref (force-pushed commits)
+dangling = collector.collect_dangling_commits()
+for commit in dangling:
+    print(f"Found hidden: {commit.sha[:8]} - {commit.message}")
+```
+
+<Tip>
+Dangling commits are "forensic gold" - they reveal force-pushed or deleted commits that attackers tried to hide.
+</Tip>
+
+## Investigation Workflow
+
+The orchestrator coordinates 17 specialized agents through a structured workflow:
+
+### Phase 0: Initialize Investigation
+
+Creates timestamped output directory and initializes empty evidence store:
+
+```
+.out/oss-forensics-{timestamp}/
+├── evidence.json              # Collected evidence
+├── evidence-request-*.md      # Follow-up requests
+├── hypothesis-*.md            # Analysis iterations
+├── evidence-verification-report.md
+└── forensic-report.md         # Final output
+```
+
+### Phase 1: Parse Research Question
+
+Extracts investigation targets:
+- Repository references (`owner/repo`)
+- Actor usernames
+- Date ranges
+- Vendor report URLs
+
+### Phase 2: Parallel Evidence Collection
+
+Spawns investigators **in parallel** for efficiency:
+
+<CodeGroup>
+```bash Investigators Spawned
+oss-investigator-gh-archive-agent   # BigQuery queries
+oss-investigator-github-agent       # GitHub API calls
+oss-investigator-wayback-agent      # Wayback Machine
+oss-investigator-local-git-agent    # Clone and analyze
+oss-investigator-ioc-extractor-agent # (if vendor report URL)
+```
+</CodeGroup>
+
+Each agent writes evidence to the shared `evidence.json` store.
+
+### Phase 3: Hypothesis Formation Loop
+
+```python
+followup_count = 0
+while followup_count < max_followups:
+    # Spawn hypothesis former
+    result = spawn_agent("oss-hypothesis-former-agent")
+    
+    if evidence_request_exists:
+        # More evidence needed
+        spawn_specific_investigator(requested_agent)
+        followup_count += 1
+    else:
+        # Hypothesis formed, exit loop
+        break
+```
+
+**The hypothesis former can request additional evidence:**
+
+```markdown
+# Evidence Request 001
+
+## Missing Evidence
+- **Need**: PushEvents for actor 'lkmanka58' on 2025-07-13
+- **Source**: GH Archive BigQuery
+- **Agent**: oss-investigator-gh-archive-agent
+
+## Reason
+Cannot determine timeline without push events.
+```
+
+### Phase 4: Evidence Verification
+
+All collected evidence is re-verified against original sources:
+
+```bash
+oss-evidence-verifier-agent → evidence-verification-report.md
+```
+
+Verification checks:
+- GH Archive events re-queried from BigQuery
+- GitHub API observations re-fetched
+- Wayback snapshots re-checked
+- Local git commits re-validated
+
+### Phase 5: Hypothesis Validation Loop
+
+```python
+retry_count = 0
+while retry_count < max_retries:
+    # Spawn checker
+    result = spawn_agent("oss-hypothesis-checker-agent")
+    
+    if hypothesis_confirmed:
+        break
+    elif rebuttal_exists:
+        # Revise hypothesis with feedback
+        spawn_agent("oss-hypothesis-former-agent", rebuttal=feedback)
+        retry_count += 1
+```
+
+**Checker validates claims against verified evidence:**
+- Every claim must cite evidence by ID
+- Attribution must have HIGH confidence with multiple sources
+- Timeline must have exact UTC timestamps
+- Impact assessment must be evidence-backed
+
+### Phase 6: Generate Report
+
+Produces final forensic report with:
+
+```markdown
+# Forensic Report
+
+## Summary
+[1-2 sentence overview]
+
+## Timeline
+| Time (UTC) | Actor | Action | Evidence |
+|------------|-------|--------|----------|
+| 2025-07-13 19:41:44 | attacker | Created tag | [EVD-001] |
+
+## Attribution
+- **Actor**: username
+  - Evidence: [EVD-001], [EVD-003]
+  - Confidence: HIGH
+
+## Intent Analysis
+[Evidence-based reasoning]
+
+## Impact Assessment
+[Scope and affected systems]
+
+## IOCs (Indicators of Compromise)
+- Commit SHAs
+- File hashes
+- Usernames
+- Repository URLs
+```
+
+## Real-World Investigation Patterns
+
+### Deleted PR Recovery
+
+**Scenario:** Media claims attacker submitted malicious PR in "late June" but PR is now deleted.
+
+**Investigation:**
+
+1. **Query GH Archive for PR events:**
+```sql
+SELECT
+    created_at,
+    JSON_EXTRACT_SCALAR(payload, '$.pull_request.number') as pr_number,
+    JSON_EXTRACT_SCALAR(payload, '$.pull_request.title') as title
+FROM `githubarchive.day.202506*`
+WHERE
+    actor.login = 'suspected-actor'
+    AND repo.name = 'target/repository'
+    AND type = 'PullRequestEvent'
+```
+
+2. **Outcome:**
+   - **If events found**: Claim verified → PR existed, recover details from archive
+   - **If no events**: Claim disproven → No PR activity in claimed timeframe
+
+### Force Push Detection
+
+**Scenario:** Suspicious commits appear then disappear from branch history.
+
+**Detection:** Zero-commit PushEvents indicate force pushes:
+
+```sql
+SELECT
+    created_at,
+    actor.login,
+    JSON_EXTRACT_SCALAR(payload, '$.before') as deleted_sha,
+    JSON_EXTRACT_SCALAR(payload, '$.head') as current_sha
+FROM `githubarchive.day.202506*`
+WHERE
+    repo.name = 'target/repo'
+    AND type = 'PushEvent'
+    AND JSON_EXTRACT_SCALAR(payload, '$.size') = '0'
+```
+
+The `before` SHA points to the "deleted" commit, which remains accessible on GitHub.
+
+### Automation vs Direct API Attack
+
+**Scenario:** Commit appears under automation account. Was it legitimate workflow or compromised token?
+
+**Detection:**
+
+```sql
+-- Search for WorkflowRunEvent near suspicious commit time
+SELECT type, created_at, actor.login
+FROM `githubarchive.day.20250713`
+WHERE
+    repo.name = 'org/repo'
+    AND type IN ('WorkflowRunEvent', 'PushEvent')
+    AND created_at BETWEEN '2025-07-13T20:25:00Z' AND '2025-07-13T20:35:00Z'
+ORDER BY created_at
+```
+
+**Results:**
+- **Legitimate workflow**: `WorkflowRunEvent` shortly before/after `PushEvent`
+- **Direct API attack**: `PushEvent` with NO `WorkflowRunEvent` in ±10 minute window
+
+<Check>
+**Real Example:** Amazon Q investigation proved direct API attack when ZERO workflow events appeared during malicious commit window, despite 18 workflows that day in different time windows.
+</Check>
+
+## Cost Management for BigQuery
+
+GitHub Archive queries cost **$6.25 per TiB** of data scanned.
+
+<Warning>
+**Unoptimized queries can cost $10-100+**
+
+A query with `SELECT *` on one year (`githubarchive.year.2025`) scans ~400 GB.
+</Warning>
+
+### Optimization Strategies
+
+**1. Select Only Required Columns (50-90% cost reduction)**
+
+```sql
+-- ❌ EXPENSIVE: Scans ALL columns (~3 GB per day)
+SELECT * FROM `githubarchive.day.20250615`
+
+-- ✅ OPTIMIZED: Scans only needed columns (~0.3 GB)
+SELECT
+    type,
+    created_at,
+    repo.name,
+    actor.login
+FROM `githubarchive.day.20250615`
+WHERE actor.login = 'target-user'
+```
+
+**2. Use Specific Date Ranges (10-100x cost reduction)**
+
+```sql
+-- ❌ EXPENSIVE: ~400 GB
+FROM `githubarchive.day.2025*`
+
+-- ✅ BETTER: ~40 GB
+FROM `githubarchive.day.202506*`
+
+-- ✅ BEST: ~3 GB
+FROM `githubarchive.day.20250615`
+```
+
+**3. Filter by Repository (5-50x cost reduction)**
+
+```sql
+WHERE
+    repo.name = 'target-org/target-repo'  -- Critical filter
+    AND actor.login = 'target-user'
+```
+
+**4. Always Run Dry Run First**
+
+```python
+from google.cloud import bigquery
+
+def estimate_cost(query):
+    client = bigquery.Client()
+    config = bigquery.QueryJobConfig(dry_run=True, use_query_cache=False)
+    job = client.query(query, job_config=config)
+    
+    gb = job.total_bytes_processed / (1024**3)
+    cost = (job.total_bytes_processed / (1024**4)) * 6.25
+    print(f"Cost estimate: {gb:.2f} GB → ${cost:.4f}")
+    return cost
+
+# Always check before running
+estimate = estimate_cost(your_query)
+if estimate > 1.0:
+    print("⚠️ HIGH COST - Review optimization")
+```
+
+<Tip>
+RAPTOR's agents automatically optimize queries and check costs before execution. Manual optimization is only needed for custom queries.
+</Tip>
+
+## Output and Evidence Store
+
+All results are saved to `.out/oss-forensics-{timestamp}/`
+
+### evidence.json Structure
+
+```json
+{
+  "evidence": [
+    {
+      "evidence_id": "evt-001",
+      "type": "PushEvent",
+      "observed_when": "2025-07-13T20:30:24Z",
+      "observed_by": "gharchive",
+      "actor": "lkmanka58",
+      "repo": "aws/aws-toolkit-vscode",
+      "verification": {
+        "source": "gharchive",
+        "table": "githubarchive.day.20250713",
+        "verified_at": "2025-07-14T10:15:33Z"
+      }
+    }
+  ]
+}
+```
+
+### Forensic Report Format
+
+The final report includes:
+
+1. **Executive Summary**: High-level findings
+2. **Timeline**: Chronological event sequence with evidence citations
+3. **Attribution**: Actor identification with confidence levels
+4. **Intent Analysis**: Evidence-based reasoning about attacker goals
+5. **Impact Assessment**: Affected systems and scope
+6. **IOCs**: Extractable indicators for detection rules
+7. **Evidence Appendix**: Full evidence details with verification status
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Start with Specific Questions">
+    **Good:** "Did lkmanka58 create any tags on aws/aws-toolkit-vscode on July 13, 2025?"
+    
+    **Bad:** "Investigate aws/aws-toolkit-vscode"
+    
+    Specific questions lead to targeted evidence collection and faster results.
+  </Accordion>
+  
+  <Accordion title="Trust the Evidence Store">
+    All evidence is verified against original sources. Don't second-guess the verification pipeline - if evidence is in the store with `verified_at` timestamp, it has been re-checked.
+  </Accordion>
+  
+  <Accordion title="Use Incremental Investigation">
+    Let the hypothesis former request additional evidence rather than collecting everything upfront. This saves time and BigQuery costs.
+  </Accordion>
+  
+  <Accordion title="Cite Everything">
+    Every claim in the final report must cite evidence by ID. No speculation, only evidence-backed conclusions.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<ResponseField name="BigQuery auth fails" type="error">
+  **Cause:** Missing or invalid `GOOGLE_APPLICATION_CREDENTIALS`
+  
+  **Fix:**
+  ```bash
+  export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+  ```
+  
+  See [GitHub Archive skill setup](https://github.com) for credential creation.
+</ResponseField>
+
+<ResponseField name="No results in expected timeframe" type="warning">
+  **Possible causes:**
+  - Event occurred outside searched date range (check timezone - GH Archive uses UTC)
+  - Actor username misspelled (case-sensitive)
+  - Repository name incorrect (must be `owner/repo` format)
+  
+  **Debug:** Query broader date range and check for typos
+</ResponseField>
+
+<ResponseField name="Max followups/retries exceeded" type="info">
+  Investigation proceeds with current evidence and notes uncertainty in report.
+  
+  **To allow more iterations:**
+  ```bash
+  /oss-forensics "your question" --max-followups 10 --max-retries 5
+  ```
+</ResponseField>
+
+## Further Reading
+
+<CardGroup cols={2}>
+  <Card title="GitHub Archive Skill" icon="database" href="https://github.com">
+    Full BigQuery query reference and optimization guide
+  </Card>
+  <Card title="Evidence Kit" icon="shield" href="https://github.com">
+    Evidence collection and verification API documentation
+  </Card>
+  <Card title="Wayback Recovery" icon="clock-rotate-left" href="https://github.com">
+    Deleted content recovery patterns and CDX API reference
+  </Card>
+  <Card title="Example Reports" icon="file-lines" href="https://github.com">
+    Real-world forensic investigation case studies
+  </Card>
+</CardGroup>

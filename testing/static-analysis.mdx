@@ -1,0 +1,371 @@
+---
+title: 'Static Analysis with Semgrep'
+description: 'Automated security scanning with parallel Semgrep execution and policy-based rule selection'
+---
+
+## Overview
+
+RAPTOR's static analysis engine combines local security rules with Semgrep's community packs for comprehensive code scanning. The scanner executes rules in parallel for improved performance and supports policy-based rule selection.
+
+## Architecture
+
+The scanner is located at `packages/static-analysis/scanner.py` and orchestrates:
+
+- **Parallel rule execution** with configurable worker pools
+- **Policy group selection** for targeted scanning
+- **SARIF output format** for standardized reporting
+- **Automatic deduplication** across multiple rule sources
+- **Repository validation** with safe git cloning
+
+## Policy Groups
+
+### Available Groups
+
+RAPTOR organizes rules into policy groups that map to both local rules and Semgrep registry packs:
+
+| Group | Local Rules | Registry Pack | Focus |
+|-------|-------------|---------------|-------|
+| `crypto` | Custom cryptography rules | `category/crypto` | Weak algorithms, key management |
+| `secrets` | Secret detection patterns | `p/secrets` | API keys, credentials, tokens |
+| `injection` | Injection vulnerability rules | `p/command-injection` | Command, SQL, LDAP injection |
+| `auth` | Authentication patterns | `p/jwt` | JWT issues, session handling |
+| `ssrf` | SSRF detection | `p/ssrf` | Server-side request forgery |
+| `deserialisation` | Unsafe deserialization | `p/insecure-deserialization` | Pickle, YAML, JSON issues |
+| `logging` | Logging security | `p/logging` | Log injection, sensitive data |
+| `filesystem` | Path traversal | `p/path-traversal` | Directory traversal |
+| `flows` | Dataflow analysis | `p/default` | Taint tracking |
+| `sinks` | Dangerous sinks | `p/xss` | XSS, dangerous functions |
+| `all` | All groups | All packs | Comprehensive scan |
+
+### Baseline Packs
+
+These packs are **always included** regardless of policy group selection:
+
+```python
+BASELINE_SEMGREP_PACKS = [
+    ("semgrep_security_audit", "p/security-audit"),
+    ("semgrep_owasp_top_10", "p/owasp-top-ten"),
+    ("semgrep_secrets", "p/secrets"),
+]
+```
+
+## CLI Usage
+
+### Basic Scan
+
+Scan a repository with default crypto rules:
+
+```bash
+python3 packages/static-analysis/scanner.py --repo /path/to/code
+```
+
+### Git Repository Clone
+
+Scan a remote repository (clones automatically):
+
+```bash
+python3 packages/static-analysis/scanner.py \
+  --repo https://github.com/example/project
+```
+
+### Multiple Policy Groups
+
+Combine multiple policy groups:
+
+```bash
+python3 packages/static-analysis/scanner.py \
+  --repo /path/to/code \
+  --policy_groups crypto,secrets,injection
+```
+
+### Comprehensive Scan
+
+Run all available policy groups:
+
+```bash
+python3 packages/static-analysis/scanner.py \
+  --repo /path/to/code \
+  --policy_groups all
+```
+
+### Sequential Mode
+
+Disable parallel scanning (useful for debugging):
+
+```bash
+python3 packages/static-analysis/scanner.py \
+  --repo /path/to/code \
+  --sequential
+```
+
+### Preserve Working Directory
+
+Keep temporary clone directory for inspection:
+
+```bash
+python3 packages/static-analysis/scanner.py \
+  --repo https://github.com/example/project \
+  --keep
+```
+
+## Parallel Execution
+
+### Worker Pool Configuration
+
+The scanner uses a configurable thread pool:
+
+```python
+MAX_SEMGREP_WORKERS = 4  # From core.config.RaptorConfig
+
+with ThreadPoolExecutor(max_workers=MAX_SEMGREP_WORKERS) as executor:
+    future_to_config = {
+        executor.submit(
+            run_single_semgrep,
+            name, config, repo_path, out_dir, timeout
+        ): (name, config)
+        for name, config in configs
+    }
+```
+
+### Performance Benefits
+
+Parallel execution provides significant speedup:
+
+- **4 workers**: 3-4x faster than sequential
+- **Per-rule timeout**: 120 seconds (configurable)
+- **Total timeout**: 900 seconds (15 minutes)
+
+## SARIF Output Format
+
+### Output Structure
+
+Each scan produces multiple SARIF files:
+
+```
+out/scan_project_20260304_123456/
+├── semgrep_category_crypto.sarif
+├── semgrep_semgrep_security_audit.sarif
+├── semgrep_semgrep_owasp_top_10.sarif
+├── combined.sarif                      # Merged + deduplicated
+├── scan_metrics.json                   # Statistics
+├── scan-manifest.json                  # Scan metadata
+└── verification.json                   # Validation data
+```
+
+### SARIF Schema
+
+RAPTOR validates all SARIF output against the official schema:
+
+```python
+from core.sarif.parser import validate_sarif
+
+is_valid = validate_sarif(sarif_path)
+if not is_valid:
+    logger.warning(f"Invalid SARIF produced by {name}")
+```
+
+### Merged Output
+
+The scanner automatically merges and deduplicates findings:
+
+```bash
+python3 engine/semgrep/tools/sarif_merge.py \
+  combined.sarif \
+  semgrep_*.sarif
+```
+
+## Scan Metrics
+
+### Generated Metrics
+
+Every scan produces comprehensive metrics:
+
+```json
+{
+  "total_findings": 42,
+  "total_files_scanned": 156,
+  "findings_by_severity": {
+    "error": 8,
+    "warning": 24,
+    "note": 10
+  },
+  "findings_by_rule": {
+    "crypto.weak-hash": 5,
+    "secrets.api-key": 3
+  },
+  "scan_duration_seconds": 127.5,
+  "scans_completed": 7,
+  "scans_failed": 0
+}
+```
+
+### Accessing Metrics
+
+```python
+from core.sarif.parser import generate_scan_metrics
+
+metrics = generate_scan_metrics(sarif_paths)
+print(f"Found {metrics['total_findings']} issues")
+```
+
+## Repository Validation
+
+### URL Validation
+
+Only trusted repository patterns are allowed:
+
+```python
+allowed_patterns = [
+    r'^https://github\.com/[\w\-]+/[\w.\-]+/?$',
+    r'^https://gitlab\.com/[\w\-]+/[\w.\-]+/?$',
+    r'^git@github\.com:[\w\-]+/[\w.\-]+\.git$',
+    r'^git@gitlab\.com:[\w\-]+/[\w.\-]+\.git$',
+]
+```
+
+Invalid URLs are rejected with security logging:
+
+```python
+if not validate_repo_url(url):
+    logger.log_security_event(
+        "invalid_repo_url",
+        f"Rejected potentially unsafe repository URL: {url}"
+    )
+    raise ValueError(f"Invalid or untrusted repository URL: {url}")
+```
+
+### Safe Git Clone
+
+Cloning uses restricted environment and timeouts:
+
+```python
+env = RaptorConfig.get_git_env()  # Strips proxy vars, limits protocols
+
+rc, so, se = run(
+    ["git", "clone", "--depth", "1", "--no-tags", url, str(repo_dir)],
+    timeout=RaptorConfig.GIT_CLONE_TIMEOUT,  # 600 seconds
+    env=env,
+)
+```
+
+## Configuration Examples
+
+### Custom Rule Directory
+
+Add your own Semgrep rules:
+
+```bash
+# Place custom rules in:
+engine/semgrep/rules/custom/
+  ├── my-pattern.yaml
+  └── dangerous-func.yaml
+
+# Scan with custom rules:
+python3 packages/static-analysis/scanner.py \
+  --repo /path/to/code \
+  --policy_groups custom
+```
+
+### Environment Configuration
+
+```bash
+# Set output directory
+export RAPTOR_OUT_DIR=/custom/output/path
+
+# Set Semgrep timeout
+export RAPTOR_SEMGREP_TIMEOUT=1800
+
+# Set parallel workers
+export RAPTOR_MAX_SEMGREP_WORKERS=8
+```
+
+## Integration with RAPTOR Pipeline
+
+### Automatic Invocation
+
+Static analysis runs automatically in `/agentic` mode:
+
+```bash
+/agentic /path/to/code --policy-groups all
+```
+
+### Phase Integration
+
+The scanner is Phase 1 of the autonomous pipeline:
+
+1. **Static Analysis** (scanner.py) → SARIF findings
+2. **Exploitability Validation** → Confirmed vulnerabilities
+3. **LLM Analysis** → Root cause analysis
+4. **Exploit Generation** → Proof-of-concept code
+
+### Output Consumption
+
+SARIF output feeds downstream tools:
+
+```python
+from core.sarif.parser import parse_sarif
+
+for finding in parse_sarif(sarif_path):
+    # Validate with exploitability pipeline
+    validate_finding(finding)
+```
+
+## Troubleshooting
+
+### Empty SARIF Output
+
+If a scan produces no results:
+
+```bash
+# Check Semgrep version
+semgrep --version
+
+# Validate rules manually
+semgrep --config engine/semgrep/rules/crypto --validate
+
+# Test on a single file
+semgrep --config p/security-audit test.py
+```
+
+### Timeout Issues
+
+Increase timeouts for large codebases:
+
+```python
+# In core/config.py:
+SEMGREP_TIMEOUT = 1800  # 30 minutes
+SEMGREP_RULE_TIMEOUT = 300  # 5 minutes per rule
+```
+
+### Validation Failures
+
+If SARIF validation fails:
+
+```python
+# Check SARIF structure:
+import json
+with open('semgrep_output.sarif') as f:
+    data = json.load(f)
+    print(data.get('$schema'))  # Should be SARIF 2.1.0
+    print(len(data.get('runs', [])))  # Should have at least 1 run
+```
+
+## Best Practices
+
+<Tip>
+**Start with targeted scans**: Use specific policy groups (e.g., `crypto,secrets`) for faster results, then expand to `all` for comprehensive coverage.
+</Tip>
+
+<Warning>
+**Repository validation**: Only scan trusted repositories. The scanner validates URLs but you should verify repository authenticity before cloning.
+</Warning>
+
+<Note>
+**Parallel vs Sequential**: Use `--sequential` only for debugging. Parallel mode is 3-4x faster with no loss of accuracy.
+</Note>
+
+## See Also
+
+- [CodeQL Analysis](/testing/codeql) - Deep semantic analysis
+- [Exploitability Validation](/testing/exploitability-validation) - Verify findings are exploitable
+- [Binary Fuzzing](/testing/binary-fuzzing) - Dynamic testing with AFL++

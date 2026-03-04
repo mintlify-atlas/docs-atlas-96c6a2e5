@@ -1,97 +1,364 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: RAPTOR - Autonomous Security Research Framework
+description: Transform Claude Code into an AI offensive/defensive security agent for vulnerability analysis, exploit generation, and patch creation
+mode: custom
 ---
 
-## Setting up
+<div className="relative overflow-hidden dark:bg-[#0f1117] bg-white">
+  {/* Hero Section */}
+  <div className="relative py-20 sm:py-24 lg:py-28">
+    <div className="mx-auto max-w-7xl px-6 lg:px-8">
+      <div className="mx-auto max-w-3xl text-center">
+        <h1 className="text-4xl font-bold tracking-tight dark:text-gray-100 text-gray-900 sm:text-5xl lg:text-6xl">
+          Autonomous Security Research Framework
+        </h1>
+        <p className="mt-6 text-base sm:text-lg leading-8 dark:text-gray-400 text-gray-600 max-w-2xl mx-auto">
+          RAPTOR transforms Claude Code into an AI security agent that autonomously scans code, fuzzes binaries, generates exploits, and creates patches—combining traditional security tools with advanced LLM reasoning.
+        </p>
+        <div className="mt-10 flex items-center justify-center gap-4 flex-wrap">
+          <a
+            href="/quickstart"
+            className="rounded-lg bg-[#fc5404] px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#e04a03] transition-colors"
+          >
+            Get started
+          </a>
+          <a
+            href="/concepts/architecture"
+            className="rounded-lg border border-gray-300 dark:border-[#27272a] bg-white/10 dark:bg-white/5 px-6 py-3 text-sm font-semibold dark:text-gray-100 text-gray-900 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
+          >
+            View architecture
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+{/* Quick Start Section */}
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-2xl sm:text-3xl font-semibold dark:text-white text-gray-900">
+      Get started in minutes
+    </h2>
+    <p className="mt-4 text-base dark:text-gray-400 text-gray-600">
+      RAPTOR works with Claude Code for interactive security testing or standalone Python scripts for automation
+    </p>
+  </div>
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+  <Steps>
+    <Step title="Install dependencies">
+      Clone the repository and install RAPTOR dependencies:
+      
+      ```bash
+      git clone https://github.com/gadievron/raptor.git
+      cd raptor
+      pip install -r requirements.txt
+      ```
+      
+      Install security tools (Semgrep, CodeQL, AFL++). Or use the pre-configured devcontainer with all tools included.
+    </Step>
 
-## Make it yours
+    <Step title="Configure your API key">
+      Set your LLM provider API key for autonomous analysis:
+      
+      ```bash
+      export ANTHROPIC_API_KEY="your-key-here"
+      # OR
+      export OPENAI_API_KEY="your-key-here"
+      ```
+      
+      <Info>RAPTOR supports Anthropic Claude, OpenAI GPT, Google Gemini, and local models via Ollama</Info>
+    </Step>
 
-Design a docs site that looks great and empowers your users.
+    <Step title="Run your first scan">
+      Launch an autonomous security scan with exploit generation:
+      
+      ```bash
+      python3 raptor.py agentic --repo /path/to/code
+      ```
+      
+      Or use Claude Code for interactive analysis:
+      
+      ```bash
+      claude
+      # Then type: /scan
+      ```
+      
+      <Accordion title="Example output">
+        ```
+        [*] Starting full autonomous workflow (Semgrep + CodeQL)...
+        [*] Found 15 vulnerabilities
+        [*] Analyzing with LLM...
+        [*] Generating exploits for 5 critical findings...
+        [*] Creating patches for all vulnerabilities...
+        
+        Results saved to: out/scan_myapp_1234567890/
+        ```
+      </Accordion>
+    </Step>
+  </Steps>
+</div>
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+{/* Key Features Section */}
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-2xl sm:text-3xl font-semibold dark:text-white text-gray-900">
+      Complete security testing toolkit
+    </h2>
+    <p className="mt-4 text-base dark:text-gray-400 text-gray-600">
+      From static analysis to exploit generation, RAPTOR handles the full security research lifecycle
+    </p>
+  </div>
 
-## Create beautiful pages
+  <CardGroup cols={2}>
+    <Card title="Static code analysis" icon="magnifying-glass" href="/testing/static-analysis">
+      Scan source code with Semgrep and CodeQL for vulnerabilities, with automatic dataflow validation
+    </Card>
+    <Card title="Binary fuzzing" icon="bug" href="/testing/binary-fuzzing">
+      Fuzz binaries with AFL++, collect crashes, and generate working exploits with GDB analysis
+    </Card>
+    <Card title="Exploit generation" icon="code" href="/analysis/exploit-generation">
+      Automatically generate compilable exploit PoCs in C with frontier LLM models
+    </Card>
+    <Card title="Patch creation" icon="shield-check" href="/analysis/patch-creation">
+      Create secure patches with LLM-powered code fixes and validation
+    </Card>
+    <Card title="Multi-agent orchestration" icon="robot" href="/advanced/multi-agent-orchestration">
+      17 specialized agents for crash analysis, OSS forensics, and exploitability validation
+    </Card>
+    <Card title="Expert personas" icon="user-tie" href="/concepts/tiered-expertise">
+      Load 9 expert personas on-demand for specialized security analysis tasks
+    </Card>
+  </CardGroup>
+</div>
 
-Everything you need to create world-class documentation.
+{/* Workflow Section */}
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-2xl sm:text-3xl font-semibold dark:text-white text-gray-900">
+      Choose your workflow
+    </h2>
+    <p className="mt-4 text-base dark:text-gray-400 text-gray-600">
+      Interactive Claude Code integration or Python CLI for automation
+    </p>
+  </div>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <a
+      href="/guides/claude-code-usage"
+      className="group block rounded-2xl border dark:border-[#27272a] border-gray-200 dark:bg-[#1a1d27] bg-gray-50 overflow-hidden no-underline dark:hover:border-[#fc5404] hover:border-[#fc5404] transition-colors"
+    >
+      <div className="h-56 overflow-hidden flex items-center justify-center dark:bg-[#0f1117] bg-gray-100">
+        <div className="text-center p-8">
+          <div className="text-6xl mb-4">💬</div>
+          <div className="text-xl font-semibold dark:text-gray-100 text-gray-900">Claude Code</div>
+        </div>
+      </div>
+      <div className="p-6">
+        <h3 className="text-base font-semibold dark:text-gray-100 text-gray-900 mb-2">
+          Interactive security testing
+        </h3>
+        <p className="text-sm dark:text-gray-400 text-gray-600 mb-4">
+          Conversational interface with slash commands, progressive expertise loading, and real-time analysis
+        </p>
+        <div className="flex items-center text-sm font-medium dark:text-gray-400 text-gray-600 group-hover:dark:text-[#fc5404] group-hover:text-[#fc5404] transition-colors">
+          Learn more
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
 
-## Need inspiration?
+    <a
+      href="/guides/python-cli"
+      className="group block rounded-2xl border dark:border-[#27272a] border-gray-200 dark:bg-[#1a1d27] bg-gray-50 overflow-hidden no-underline dark:hover:border-[#fc5404] hover:border-[#fc5404] transition-colors"
+    >
+      <div className="h-56 overflow-hidden flex items-center justify-center dark:bg-[#0f1117] bg-gray-100">
+        <div className="text-center p-8">
+          <div className="text-6xl mb-4">🐍</div>
+          <div className="text-xl font-semibold dark:text-gray-100 text-gray-900">Python CLI</div>
+        </div>
+      </div>
+      <div className="p-6">
+        <h3 className="text-base font-semibold dark:text-gray-100 text-gray-900 mb-2">
+          Automated security workflows
+        </h3>
+        <p className="text-sm dark:text-gray-400 text-gray-600 mb-4">
+          Scriptable interface for CI/CD integration, batch processing, and automated security testing
+        </p>
+        <div className="flex items-center text-sm font-medium dark:text-gray-400 text-gray-600 group-hover:dark:text-[#fc5404] group-hover:text-[#fc5404] transition-colors">
+          Learn more
+          <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+{/* Commands Overview */}
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-2xl sm:text-3xl font-semibold dark:text-white text-gray-900">
+      Available commands
+    </h2>
+    <p className="mt-4 text-base dark:text-gray-400 text-gray-600">
+      Comprehensive security testing capabilities at your fingertips
+    </p>
+  </div>
+
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="rounded-xl border dark:border-[#27272a] border-gray-200 dark:bg-[#1a1d27] bg-gray-50 p-5">
+      <div className="font-mono text-sm dark:text-[#fc5404] text-[#fc5404] mb-2">/scan</div>
+      <div className="text-sm dark:text-gray-400 text-gray-600">Static analysis with Semgrep + CodeQL</div>
+    </div>
+    <div className="rounded-xl border dark:border-[#27272a] border-gray-200 dark:bg-[#1a1d27] bg-gray-50 p-5">
+      <div className="font-mono text-sm dark:text-[#fc5404] text-[#fc5404] mb-2">/fuzz</div>
+      <div className="text-sm dark:text-gray-400 text-gray-600">Binary fuzzing with AFL++</div>
+    </div>
+    <div className="rounded-xl border dark:border-[#27272a] border-gray-200 dark:bg-[#1a1d27] bg-gray-50 p-5">
+      <div className="font-mono text-sm dark:text-[#fc5404] text-[#fc5404] mb-2">/agentic</div>
+      <div className="text-sm dark:text-gray-400 text-gray-600">Full autonomous workflow</div>
+    </div>
+    <div className="rounded-xl border dark:border-[#27272a] border-gray-200 dark:bg-[#1a1d27] bg-gray-50 p-5">
+      <div className="font-mono text-sm dark:text-[#fc5404] text-[#fc5404] mb-2">/exploit</div>
+      <div className="text-sm dark:text-gray-400 text-gray-600">Generate exploit PoCs</div>
+    </div>
+    <div className="rounded-xl border dark:border-[#27272a] border-gray-200 dark:bg-[#1a1d27] bg-gray-50 p-5">
+      <div className="font-mono text-sm dark:text-[#fc5404] text-[#fc5404] mb-2">/patch</div>
+      <div className="text-sm dark:text-gray-400 text-gray-600">Create security patches</div>
+    </div>
+    <div className="rounded-xl border dark:border-[#27272a] border-gray-200 dark:bg-[#1a1d27] bg-gray-50 p-5">
+      <div className="font-mono text-sm dark:text-[#fc5404] text-[#fc5404] mb-2">/validate</div>
+      <div className="text-sm dark:text-gray-400 text-gray-600">Exploitability validation</div>
+    </div>
+  </div>
+
+  <div className="mt-6 text-center">
+    <a href="/api/commands/scan" className="text-sm font-medium dark:text-[#fc5404] text-[#fc5404] hover:underline">
+      View all commands →
+    </a>
+  </div>
+</div>
+
+{/* Architecture Highlight */}
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-2xl border dark:border-[#27272a] border-gray-200 dark:bg-[#1a1d27] bg-gray-50 p-8 lg:p-12">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+      <div>
+        <h2 className="text-2xl sm:text-3xl font-semibold dark:text-white text-gray-900 mb-4">
+          Modular architecture
+        </h2>
+        <p className="text-base dark:text-gray-400 text-gray-600 mb-6">
+          RAPTOR's layered design separates concerns cleanly: 9 independent security packages, a shared core layer, and progressive expertise loading for optimal context management.
+        </p>
+        <ul className="space-y-3">
+          <li className="flex items-start">
+            <svg className="w-5 h-5 dark:text-[#fc5404] text-[#fc5404] mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm dark:text-gray-300 text-gray-700">9 security packages with no cross-dependencies</span>
+          </li>
+          <li className="flex items-start">
+            <svg className="w-5 h-5 dark:text-[#fc5404] text-[#fc5404] mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm dark:text-gray-300 text-gray-700">17 specialized agents for autonomous workflows</span>
+          </li>
+          <li className="flex items-start">
+            <svg className="w-5 h-5 dark:text-[#fc5404] text-[#fc5404] mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm dark:text-gray-300 text-gray-700">Tiered expertise system with 9 expert personas</span>
+          </li>
+          <li className="flex items-start">
+            <svg className="w-5 h-5 dark:text-[#fc5404] text-[#fc5404] mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm dark:text-gray-300 text-gray-700">Provider-agnostic LLM abstraction layer</span>
+          </li>
+        </ul>
+        <div className="mt-8">
+          <a
+            href="/concepts/architecture"
+            className="inline-flex items-center text-sm font-medium dark:text-[#fc5404] text-[#fc5404] hover:underline"
+          >
+            Explore the architecture
+            <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </a>
+        </div>
+      </div>
+      <div className="dark:bg-[#0f1117] bg-gray-100 rounded-xl p-6 overflow-auto">
+        <pre className="text-xs dark:text-gray-300 text-gray-700 font-mono">
+{`raptor/
+├── core/              # Shared utilities
+├── packages/          # 9 capabilities
+│   ├── static-analysis/
+│   ├── codeql/
+│   ├── llm_analysis/
+│   ├── fuzzing/
+│   ├── binary_analysis/
+│   ├── exploitability_validation/
+│   ├── autonomous/
+│   ├── web/
+│   └── ...
+├── .claude/
+│   ├── agents/        # 17 specialists
+│   └── skills/        # Reusable skills
+├── tiers/
+│   └── personas/      # 9 experts
+└── raptor.py          # Main launcher`}
+        </pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+{/* Resources Section */}
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-2xl sm:text-3xl font-semibold dark:text-white text-gray-900">
+      Resources and community
+    </h2>
+    <p className="mt-4 text-base dark:text-gray-400 text-gray-600">
+      Everything you need to get the most out of RAPTOR
+    </p>
+  </div>
+
+  <CardGroup cols={3}>
+    <Card title="Dependencies" icon="box" href="/resources/dependencies">
+      External tools and license information
+    </Card>
+    <Card title="DevContainer" icon="docker" href="/resources/devcontainer">
+      Pre-configured development environment
+    </Card>
+    <Card title="Contributing" icon="code-pull-request" href="/resources/contributing">
+      How to contribute to RAPTOR
+    </Card>
+  </CardGroup>
+</div>
+
+{/* CTA Banner */}
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-2xl border dark:border-[#27272a] border-gray-200 dark:bg-[#1a1d27] bg-gray-50 p-8 lg:p-12 text-center">
+    <h2 className="text-2xl sm:text-3xl font-semibold dark:text-white text-gray-900 mb-4">
+      Ready to start hunting vulnerabilities?
+    </h2>
+    <p className="text-base dark:text-gray-400 text-gray-600 mb-8 max-w-2xl mx-auto">
+      Get started with RAPTOR in under 5 minutes. Clone the repo, configure your API key, and run your first autonomous security scan.
+    </p>
+    <a
+      href="/quickstart"
+      className="inline-flex items-center rounded-lg bg-[#fc5404] px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#e04a03] transition-colors"
+    >
+      Get started now
+      <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </a>
+  </div>
+</div>

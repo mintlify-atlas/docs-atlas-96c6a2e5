@@ -1,0 +1,202 @@
+---
+title: "/codeql"
+description: "RAPTOR CodeQL deep static analysis"
+---
+
+## Overview
+
+The `/codeql` command performs deep static analysis using GitHub's CodeQL engine with dataflow and taint tracking validation. It's slower than Semgrep but finds complex vulnerabilities that pattern-based scanners miss.
+
+## Syntax
+
+```bash
+python3 raptor.py codeql --repo <path> [options]
+```
+
+## Parameters
+
+<ParamField path="repo" type="string" required>
+  Absolute path to the code repository to analyze
+</ParamField>
+
+<ParamField path="language" type="string">
+  Programming language (auto-detected if not specified)
+</ParamField>
+
+<ParamField path="max-findings" type="integer">
+  Maximum number of findings to report (default: unlimited)
+</ParamField>
+
+## What It Does
+
+1. Creates CodeQL database from source code
+2. Runs security and quality queries
+3. Performs dataflow and taint analysis
+4. Validates source-to-sink paths
+5. Generates SARIF output with detailed findings
+6. Saves results to `out/` directory
+
+## When to Use CodeQL
+
+### Use CodeQL When:
+
+- Looking for complex dataflow vulnerabilities
+- Need to trace data from source to sink
+- Analyzing security-critical codebases
+- Semgrep produces too many false positives
+- Need high-confidence findings
+
+### Use Semgrep When:
+
+- Need fast results
+- Checking for common patterns
+- Running in CI/CD pipelines
+- Performing quick audits
+
+## Examples
+
+### Basic CodeQL Analysis
+
+```bash
+python3 raptor.py codeql --repo /path/to/code
+```
+
+Runs full CodeQL analysis with dataflow validation.
+
+### Specific Language
+
+```bash
+python3 raptor.py codeql --repo /path/to/code --language python
+```
+
+Analyzes Python code only.
+
+### Limited Findings
+
+```bash
+python3 raptor.py codeql --repo /path/to/code --max-findings 20
+```
+
+Reports only the first 20 findings.
+
+## Supported Languages
+
+- **C/C++**: Buffer overflows, use-after-free, format strings
+- **Java**: SQL injection, XSS, deserialization
+- **JavaScript/TypeScript**: Prototype pollution, code injection
+- **Python**: Command injection, path traversal, SQL injection
+- **C#**: LDAP injection, XXE, insecure deserialization
+- **Go**: SQL injection, command injection, path traversal
+- **Ruby**: Code injection, SQL injection, SSRF
+
+## Vulnerability Classes Detected
+
+### Injection Vulnerabilities
+
+- SQL injection
+- Command injection
+- LDAP injection
+- XPath injection
+- Code injection
+
+### Dataflow Issues
+
+- Tainted path traversal
+- Server-side request forgery (SSRF)
+- Cross-site scripting (XSS)
+- XML external entity (XXE)
+
+### Memory Safety
+
+- Buffer overflows
+- Use-after-free
+- Double free
+- Memory leaks
+
+### Cryptographic Issues
+
+- Weak encryption algorithms
+- Insecure random number generation
+- Hard-coded credentials
+
+## Output Structure
+
+```
+out/codeql_<timestamp>/
+├── database/              # CodeQL database
+├── findings.sarif        # SARIF format results
+├── report.md             # Human-readable report
+└── dataflow-paths.json   # Source-to-sink traces
+```
+
+## Performance Characteristics
+
+| Metric | CodeQL | Semgrep |
+|--------|--------|----------|
+| **Speed** | Slow (5-30 min) | Fast (30-120 sec) |
+| **Accuracy** | High | Medium |
+| **False Positives** | Low | Higher |
+| **Dataflow Analysis** | Yes | Limited |
+| **Database Size** | Large (GBs) | None |
+
+## Use Cases
+
+- Security-critical application audits
+- Finding complex vulnerabilities
+- Validating Semgrep findings
+- Research on dataflow vulnerabilities
+- High-assurance security reviews
+
+## Advanced Features
+
+### Dataflow Analysis
+
+CodeQL tracks data from sources (user input) to sinks (dangerous operations):
+
+```python
+# CodeQL can trace this flow:
+user_input = request.GET['file']  # Source
+path = os.path.join('/data', user_input)  # Taint propagation
+with open(path) as f:  # Sink - path traversal detected!
+    return f.read()
+```
+
+### Custom Queries
+
+CodeQL supports custom security queries for domain-specific checks:
+
+```ql
+import python
+
+from Call call, Expr arg
+where
+  call.getFunc().(Name).getId() = "eval" and
+  arg = call.getArg(0) and
+  arg.getAFlowSource() instanceof ExternalInput
+select call, "Dangerous eval with user input"
+```
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="/scan" href="/api/commands/scan">
+    Fast Semgrep scanning
+  </Card>
+  <Card title="/agentic" href="/api/commands/agentic">
+    Full workflow with both Semgrep and CodeQL
+  </Card>
+  <Card title="/validate" href="/api/commands/validate">
+    Validate findings exploitability
+  </Card>
+  <Card title="/analyze" href="/api/commands/analyze">
+    LLM analysis of CodeQL results
+  </Card>
+</CardGroup>
+
+## Notes
+
+- CodeQL analysis is slower but finds complex issues
+- Requires significant disk space for databases
+- Best used for thorough security audits
+- Combines well with Semgrep in `/agentic` mode
+- Results are high-confidence and low false-positive

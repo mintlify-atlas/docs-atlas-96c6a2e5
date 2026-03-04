@@ -1,0 +1,552 @@
+---
+title: OSS Forensics System
+description: Evidence-backed forensic investigation for GitHub repositories
+---
+
+The OSS Forensics system provides evidence-backed forensic investigation for public GitHub repositories, collecting tamper-proof evidence from multiple sources and forming validated hypotheses about security incidents.
+
+## System Overview
+
+The OSS forensics system consists of:
+
+- **oss-forensics-agent**: Main orchestrator (not yet documented - uses investigator agents)
+- **oss-investigator-gh-archive-agent**: Queries GH Archive via BigQuery for tamper-proof events
+- **oss-investigator-github-agent**: Queries GitHub API and recovers "deleted" commits
+- **oss-investigator-wayback-agent**: Recovers deleted content via Wayback Machine
+- **oss-investigator-local-git-agent**: Analyzes cloned repos for dangling commits
+- **oss-investigator-ioc-extractor-agent**: Extracts IOCs from vendor security reports
+- **oss-hypothesis-former-agent**: Forms evidence-backed hypotheses
+- **oss-evidence-verifier-agent**: Verifies all evidence against original sources
+- **oss-hypothesis-checker-agent**: Validates hypothesis claims
+- **oss-report-generator-agent**: Produces final forensic report
+
+## Invocation
+
+```bash
+/oss-forensics <prompt> [--max-followups 3] [--max-retries 3]
+```
+
+**Example**:
+```bash
+/oss-forensics "Investigate the supply chain attack on aws/aws-toolkit-vscode in July 2025"
+```
+
+## System Architecture
+
+<Steps>
+  <Step title="Evidence Collection">
+    Parallel investigation agents collect evidence from multiple sources
+  </Step>
+  
+  <Step title="Hypothesis Formation">
+    Analyst forms hypothesis from collected evidence
+  </Step>
+  
+  <Step title="Evidence Verification">
+    All evidence verified against original sources
+  </Step>
+  
+  <Step title="Hypothesis Validation">
+    Claims validated against verified evidence only
+  </Step>
+  
+  <Step title="Iteration">
+    If rejected, collect more evidence or refine hypothesis
+  </Step>
+  
+  <Step title="Final Report">
+    Generate comprehensive forensic report
+  </Step>
+</Steps>
+
+## Evidence Sources
+
+The system collects forensic evidence from:
+
+<AccordionGroup>
+  <Accordion title="GH Archive (BigQuery)">
+    **Tamper-proof event history**
+    
+    - PushEvents (commits pushed)
+    - PullRequestEvents (PRs opened/closed/merged)
+    - IssuesEvents (issues opened/closed)
+    - CreateEvent/DeleteEvent (branches/tags created/deleted)
+    - WorkflowRunEvent (GitHub Actions runs)
+    
+    **Key advantage**: Events persist after deletion, cannot be tampered with
+  </Accordion>
+
+  <Accordion title="GitHub API">
+    **Live repository state**
+    
+    - Commits (including "deleted" ones via direct SHA access)
+    - Pull requests
+    - Issues
+    - Forks
+    
+    **Key capability**: "Deleted" commits remain accessible via SHA even after force-push
+  </Accordion>
+
+  <Accordion title="Wayback Machine">
+    **Archived web snapshots**
+    
+    - Deleted repository pages
+    - Deleted issues/PRs
+    - Historical file content
+    
+    **Use when**: Content truly deleted from GitHub
+  </Accordion>
+
+  <Accordion title="Local Git Forensics">
+    **Dangling commits and reflog**
+    
+    - Unreachable commits (force-pushed history)
+    - Reflog analysis
+    - Author/committer mismatches
+    
+    **Key capability**: Reveals force-pushed or deleted history
+  </Accordion>
+
+  <Accordion title="Vendor Security Reports">
+    **Indicators of Compromise (IOCs)**
+    
+    - Commit SHAs
+    - Repository names
+    - Usernames
+    - Email addresses
+    - File paths
+    - URLs, IPs, domains
+  </Accordion>
+</AccordionGroup>
+
+## Investigator Agents
+
+### oss-investigator-gh-archive-agent
+
+**Specialty**: GH Archive BigQuery queries for tamper-proof forensic evidence
+
+**Workflow**:
+
+<Steps>
+  <Step title="Construct BigQuery Queries">
+    Based on targets (repos, actors, date ranges), build queries for relevant event types
+  </Step>
+  
+  <Step title="Execute Queries">
+    Using `GHArchiveCollector` or custom BigQuery queries
+    
+    ```python
+    from src.collectors import GHArchiveCollector
+    from src import EvidenceStore
+    
+    collector = GHArchiveCollector()
+    store = EvidenceStore.load(f"{workdir}/evidence.json")
+    
+    events = collector.collect_events(
+        timestamp="YYYYMMDDHHMM",
+        repo="owner/repo",
+        actor="username"
+    )
+    store.add_all(events)
+    store.save(f"{workdir}/evidence.json")
+    ```
+  </Step>
+  
+  <Step title="Key Investigation Patterns">
+    - **Force push recovery**: Find deleted commits via PushEvent with size=0
+    - **Workflow vs Direct API**: Distinguish legitimate automation from abuse
+    - **Deleted tags/branches**: Both persist in archive after deletion
+  </Step>
+</Steps>
+
+<Warning>
+  When running custom BigQuery queries across multiple tables, MUST pass `table=` parameter to `parse_gharchive_event()` for proper verification.
+</Warning>
+
+### oss-investigator-github-agent
+
+**Specialty**: ALL GitHub API operations, including commit recovery via direct SHA access
+
+**Key Capability**: "Deleted" commits remain accessible via SHA even after force-push or branch deletion
+
+**Workflow**:
+
+```python
+from src.collectors import GitHubAPICollector
+from src import EvidenceStore
+
+collector = GitHubAPICollector()
+store = EvidenceStore.load(f"{workdir}/evidence.json")
+
+# Collect current state
+commit = collector.collect_commit("owner", "repo", "sha")
+pr = collector.collect_pull_request("owner", "repo", 123)
+issue = collector.collect_issue("owner", "repo", 456)
+forks = collector.collect_forks("owner", "repo")
+
+store.add(commit)
+store.add(pr)
+store.add_all(forks)
+store.save(f"{workdir}/evidence.json")
+```
+
+**Recover "Deleted" Commits**:
+
+```bash
+# Fetch commit as patch - works for "deleted" commits
+curl -L -o commit.patch https://github.com/owner/repo/commit/SHA.patch
+
+# Via API
+curl https://api.github.com/repos/owner/repo/commits/SHA
+```
+
+<Info>
+  Commits are only truly gone if the entire repo is deleted AND no public forks exist. Otherwise, they remain forensically accessible.
+</Info>
+
+### oss-investigator-wayback-agent
+
+**Specialty**: Wayback Machine recovery for truly deleted content
+
+**When to Use**: Content deleted from GitHub and not accessible via API
+
+**Workflow**:
+
+```python
+from src.collectors import WaybackCollector
+from src import EvidenceStore
+
+collector = WaybackCollector()
+store = EvidenceStore.load(f"{workdir}/evidence.json")
+
+# Find archived snapshots
+snapshots = collector.collect_snapshots(
+    "https://github.com/owner/repo/issues/123"
+)
+
+# Get content from specific timestamp
+content = collector.collect_snapshot_content(
+    "https://github.com/owner/repo/issues/123",
+    "20250713203024"
+)
+
+store.add(content)
+store.save(f"{workdir}/evidence.json")
+```
+
+**CDX API Queries**:
+
+```bash
+# All archived pages for a repo
+curl "https://web.archive.org/cdx/search/cdx?url=github.com/owner/repo/*&output=json&collapse=urlkey"
+
+# Specific issue
+curl "https://web.archive.org/cdx/search/cdx?url=github.com/owner/repo/issues/123&output=json"
+```
+
+### oss-investigator-local-git-agent
+
+**Specialty**: Local git repository forensics for dangling commits
+
+**Workflow**:
+
+<Steps>
+  <Step title="Clone Repository">
+    ```bash
+    cd {workdir}/repos
+    git clone --mirror https://github.com/owner/repo.git
+    cd repo.git
+    ```
+    
+    Use `--mirror` to get all refs including those not normally fetched
+  </Step>
+  
+  <Step title="Find Dangling Commits">
+    ```python
+    from src.collectors import LocalGitCollector
+    from src import EvidenceStore
+    
+    collector = LocalGitCollector(f"{workdir}/repos/repo.git")
+    store = EvidenceStore.load(f"{workdir}/evidence.json")
+    
+    # Find dangling commits
+    dangling = collector.collect_dangling_commits()
+    for commit in dangling:
+        print(f"Found dangling: {commit.sha[:8]} - {commit.message}")
+        store.add(commit)
+    
+    store.save(f"{workdir}/evidence.json")
+    ```
+    
+    Or via git directly:
+    ```bash
+    git fsck --unreachable --no-reflogs | grep commit
+    git show <SHA>
+    ```
+  </Step>
+  
+  <Step title="Analyze Reflog">
+    ```bash
+    git reflog show --all
+    git reflog show refs/heads/main
+    ```
+  </Step>
+  
+  <Step title="Examine Commits">
+    ```bash
+    # Detect author/committer mismatch (forgery)
+    git log -1 --format="%an <%ae> (author)%n%cn <%ce> (committer)" <SHA>
+    ```
+  </Step>
+</Steps>
+
+### oss-investigator-ioc-extractor-agent
+
+**Specialty**: Extract IOCs from vendor security reports
+
+**When to Run**: Only when vendor report URL is provided
+
+**IOC Types Extracted**:
+
+| Type | Pattern Examples |
+|------|------------------|
+| COMMIT_SHA | 40-char hex: `678851bbe9776228f55e0460e66a6167ac2a1685` |
+| REPOSITORY | `owner/repo` format |
+| USERNAME | GitHub usernames |
+| EMAIL | Email addresses in commits/reports |
+| FILE_PATH | `src/malware.js` |
+| TAG_NAME | `v1.0.0`, `stability` |
+| BRANCH_NAME | `main`, `feature-x` |
+| URL | GitHub URLs, external URLs |
+| IP_ADDRESS | IPv4/IPv6 addresses |
+| DOMAIN | Domain names |
+
+**Workflow**:
+
+```python
+from src import EvidenceStore, EvidenceSource, IOCType
+from src.schema import IOC, VerificationInfo
+
+store = EvidenceStore.load(f"{workdir}/evidence.json")
+
+ioc = IOC(
+    evidence_id=f"ioc-{ioc_type.lower()}-{value[:16]}",
+    observed_when=datetime.now(timezone.utc),
+    observed_by=EvidenceSource.SECURITY_VENDOR,
+    observed_what=f"{ioc_type} extracted from vendor report",
+    verification=VerificationInfo(
+        source=EvidenceSource.SECURITY_VENDOR,
+        url=HttpUrl(vendor_report_url)
+    ),
+    ioc_type=IOCType.COMMIT_SHA,
+    value=value,
+)
+
+store.add(ioc)
+store.save(f"{workdir}/evidence.json")
+```
+
+## Analysis Agents
+
+### oss-hypothesis-former-agent
+
+**Role**: ANALYST - reads evidence and forms hypotheses
+
+**Does NOT collect evidence** - if more evidence needed, writes evidence request file
+
+**Workflow**:
+
+<Steps>
+  <Step title="Load Evidence">
+    ```python
+    from src import EvidenceStore
+    
+    store = EvidenceStore.load(f"{workdir}/evidence.json")
+    print(store.summary())
+    
+    # Query evidence
+    commits = store.filter(observation_type="commit")
+    events = store.filter(source="gharchive")
+    ```
+  </Step>
+  
+  <Step title="Assess Evidence Sufficiency">
+    Can we answer:
+    - **Timeline**: When did events occur?
+    - **Attribution**: Who did what?
+    - **Intent**: What was the goal?
+    - **Impact**: What was affected?
+  </Step>
+  
+  <Step title="Request More Evidence (If Needed)">
+    Write `evidence-request-{counter}.md`:
+    
+    ```markdown
+    # Evidence Request 001
+    
+    ## Missing Evidence
+    - **Need**: PushEvents for actor 'lkmanka58' on 2025-07-13
+    - **Source**: GH Archive BigQuery
+    - **Agent**: oss-investigator-gh-archive-agent
+    - **Query**: "Query PushEvents where actor.login='lkmanka58' and repo.name='aws/aws-toolkit-vscode' on 2025-07-13"
+    
+    ## Reason
+    Cannot determine timeline without push events.
+    ```
+    
+    Orchestrator reads this and spawns appropriate investigator agent.
+  </Step>
+  
+  <Step title="Form Hypothesis">
+    Write `hypothesis-YYY.md` with:
+    - Research question
+    - Summary
+    - Timeline (with evidence citations)
+    - Attribution (with confidence levels)
+    - Intent analysis
+    - Impact assessment
+  </Step>
+</Steps>
+
+**Citation Requirements**:
+
+<Warning>
+  EVERY claim must cite evidence by ID.
+  
+  Bad: "The attacker created a tag on July 13."
+  
+  Good: "The attacker created a tag on July 13 at 19:41:44 UTC [EVD-001]."
+</Warning>
+
+### oss-evidence-verifier-agent
+
+**Role**: VERIFIER - verifies existing evidence against original sources
+
+**Does NOT collect new evidence**
+
+**Workflow**:
+
+```python
+from src import EvidenceStore
+
+store = EvidenceStore.load(f"{workdir}/evidence.json")
+print(f"Loaded {len(store)} evidence items")
+
+# Verify all evidence
+is_valid, errors = store.verify_all()
+```
+
+This re-fetches:
+- GH Archive evidence via BigQuery
+- GitHub API-sourced evidence
+- Wayback snapshots
+- Local git commits
+- Vendor IOCs
+
+**Output**: `evidence-verification-report.md` with verification status
+
+### oss-hypothesis-checker-agent
+
+**Role**: VALIDATOR - validates hypothesis claims against verified evidence
+
+**Does NOT collect new evidence or form hypotheses**
+
+**Workflow**:
+
+<Steps>
+  <Step title="Load Inputs">
+    - `hypothesis-YYY.md`
+    - `evidence-verification-report.md`
+    - `evidence.json`
+  </Step>
+  
+  <Step title="Mechanical Format Check">
+    - All claims have `[EVD-XXX]` citations?
+    - All cited evidence exists in evidence.json?
+    - All cited evidence is VERIFIED?
+  </Step>
+  
+  <Step title="Content Validation">
+    - Timeline chronologically consistent?
+    - Attribution sufficiently supported?
+    - No logical contradictions?
+    - No unsupported leaps in reasoning?
+  </Step>
+  
+  <Step title="Decision">
+    **REJECT if**:
+    - Missing citations
+    - Citations to non-existent evidence
+    - Citations to UNVERIFIED evidence
+    - Timeline inconsistencies
+    - Unsupported claims
+    
+    **ACCEPT if**: All checks pass
+  </Step>
+  
+  <Step title="Write Output">
+    If REJECTED: `hypothesis-YYY-rebuttal.md`
+    
+    If ACCEPTED: `hypothesis-YYY-confirmed.md`
+  </Step>
+</Steps>
+
+### oss-report-generator-agent
+
+**Role**: REPORT GENERATOR - produces final forensic report
+
+**Does NOT investigate or validate**
+
+**Workflow**:
+
+<Steps>
+  <Step title="Load Confirmed Hypothesis">
+    - `hypothesis-YYY-confirmed.md`
+    - `evidence.json`
+    - `evidence-verification-report.md`
+  </Step>
+  
+  <Step title="Generate Report">
+    Write `forensic-report.md` with:
+    - Executive summary
+    - Timeline with evidence citations
+    - Attribution with confidence levels
+    - Intent analysis
+    - Impact assessment
+    - IOCs table
+    - Methodology appendix
+  </Step>
+</Steps>
+
+## Output Artifacts
+
+```
+.out/oss-forensics-20260304_130000/
+├── repos/
+│   └── repo.git/ (mirror clone)
+├── evidence.json
+├── evidence-request-001.md (if more evidence needed)
+├── hypothesis-001.md
+├── hypothesis-001-rebuttal.md (if rejected)
+├── hypothesis-001-confirmed.md
+├── evidence-verification-report.md
+└── forensic-report.md
+```
+
+## Requirements
+
+- **GOOGLE_APPLICATION_CREDENTIALS**: For BigQuery access to GH Archive
+- Git client for local repository analysis
+- Internet access for GitHub API and Wayback Machine
+
+## Related Agents
+
+<CardGroup cols={2}>
+  <Card title="OffSec Specialist" icon="shield-halved" href="/api/agents/offsec-specialist">
+    Offensive security operations and vulnerability research
+  </Card>
+  
+  <Card title="Crash Analysis" icon="bug" href="/api/agents/crash-analysis">
+    Autonomous root-cause analysis for crashes
+  </Card>
+</CardGroup>

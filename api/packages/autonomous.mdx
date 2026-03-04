@@ -1,0 +1,702 @@
+---
+title: "Autonomous"
+description: "Intelligent decision-making and adaptive strategies for autonomous security testing"
+icon: "robot"
+---
+
+## Overview
+
+The Autonomous package transforms RAPTOR from automation into true autonomy. It provides intelligent planning, learning from past experiences, multi-turn reasoning, and goal-directed behavior for security testing.
+
+## Purpose
+
+Enable autonomous behavior through:
+- **Intelligent planning**: Decisions based on fuzzing state, not fixed pipelines
+- **Learning**: Remember what works and what doesn't
+- **Multi-turn reasoning**: Deep LLM conversations for complex analysis
+- **Goal-directed**: Focus on specific objectives (RCE, info leak, etc.)
+- **Adaptive strategies**: Change approach based on feedback
+
+## Architecture
+
+```python
+packages/autonomous/
+├── planner.py              # Intelligent decision-making
+├── memory.py               # Knowledge persistence
+├── dialogue.py             # Multi-turn LLM reasoning
+├── goal_planner.py         # Goal-directed planning
+├── exploit_validator.py    # Exploit validation
+└── corpus_generator.py     # Intelligent corpus generation
+```
+
+## Quick Start
+
+### Autonomous Fuzzing
+
+```python
+from packages.autonomous import FuzzingPlanner, FuzzingState
+from pathlib import Path
+import time
+
+# Initialize planner
+planner = FuzzingPlanner()
+
+# Create initial state
+state = FuzzingState(
+    start_time=time.time(),
+    current_time=time.time(),
+    binary_path=Path("target_binary"),
+    has_asan=True,
+    has_afl_instrumentation=True
+)
+
+# Let planner decide what to do
+action = planner.decide_next_action(state)
+print(f"Decision: {action}")
+print(f"Reasoning: {planner.get_reasoning()}")
+```
+
+### With Memory
+
+```python
+from packages.autonomous import FuzzingPlanner, FuzzingMemory
+
+# Initialize with memory for learning
+memory = FuzzingMemory(storage_path=Path(".raptor/memory"))
+planner = FuzzingPlanner(memory=memory)
+
+# Planner learns from past campaigns
+action = planner.decide_next_action(state)
+
+# Record outcome
+planner.record_success(action, state)
+```
+
+### Multi-Turn Analysis
+
+```python
+from packages.autonomous import MultiTurnAnalyser
+from pathlib import Path
+
+analyser = MultiTurnAnalyser(
+    repo_path=Path("/path/to/code"),
+    out_dir=Path("out/analysis")
+)
+
+# Deep analysis with multiple LLM turns
+result = analyser.analyze_vulnerability(
+    finding_id="sqli-001",
+    initial_context="SQL injection in user login",
+    max_turns=5
+)
+
+print(f"Turns: {result['turns']}")
+print(f"Conclusion: {result['conclusion']}")
+print(f"Confidence: {result['confidence']}")
+```
+
+## Core Classes
+
+### FuzzingPlanner
+
+Autonomous decision-making for fuzzing campaigns.
+
+```python
+class FuzzingPlanner:
+    def __init__(self, memory: Optional[FuzzingMemory] = None)
+    
+    def decide_next_action(
+        self,
+        state: FuzzingState
+    ) -> Action
+    
+    def record_success(
+        self,
+        action: Action,
+        state: FuzzingState
+    ) -> None
+    
+    def record_failure(
+        self,
+        action: Action,
+        state: FuzzingState,
+        reason: str
+    ) -> None
+    
+    def get_reasoning(self) -> str
+```
+
+<ParamField path="memory" type="Optional[FuzzingMemory]">
+  Memory instance for learning (enables knowledge persistence)
+</ParamField>
+
+### FuzzingState
+
+Complete state for autonomous decision-making.
+
+<ParamField path="start_time" type="float" required>
+  Campaign start timestamp
+</ParamField>
+
+<ParamField path="current_time" type="float" required>
+  Current timestamp
+</ParamField>
+
+<ParamField path="total_execs" type="int" default="0">
+  Total executions so far
+</ParamField>
+
+<ParamField path="execs_per_sec" type="float" default="0.0">
+  Execution speed
+</ParamField>
+
+<ParamField path="total_coverage" type="int" default="0">
+  Total code coverage
+</ParamField>
+
+<ParamField path="total_crashes" type="int" default="0">
+  Total crashes found
+</ParamField>
+
+<ParamField path="unique_crashes" type="int" default="0">
+  Unique crashes (deduplicated)
+</ParamField>
+
+<ParamField path="exploitable_crashes" type="int" default="0">
+  Exploitable crashes
+</ParamField>
+
+<ParamField path="current_strategy" type="str" default="default">
+  Current fuzzing strategy
+</ParamField>
+
+<ParamField path="target_goal" type="Optional[str]">
+  Target goal (e.g., "RCE", "info_leak")
+</ParamField>
+
+### Action
+
+Actions the fuzzer can take autonomously.
+
+```python
+class Action(Enum):
+    # Fuzzing strategy
+    CONTINUE_FUZZING = "continue_fuzzing"
+    STOP_FUZZING = "stop_fuzzing"
+    INCREASE_DURATION = "increase_duration"
+    CHANGE_MUTATOR = "change_mutator"
+    ADD_DICTIONARY = "add_dictionary"
+    INTENSIFY_CORPUS = "intensify_corpus"
+    
+    # Analysis
+    DEEP_ANALYSE_CRASH = "deep_analyse_crash"
+    SKIP_DUPLICATE_CRASH = "skip_duplicate_crash"
+    PRIORITISE_CRASH = "prioritise_crash"
+    
+    # Exploit development
+    VALIDATE_EXPLOIT = "validate_exploit"
+    REFINE_EXPLOIT = "refine_exploit"
+    TRY_ALTERNATIVE_TECHNIQUE = "try_alternative_technique"
+    
+    # Learning
+    SAVE_STRATEGY = "save_strategy"
+    LOAD_STRATEGY = "load_strategy"
+    
+    # Goal-directed
+    FOCUS_ON_PARSER = "focus_on_parser"
+    FOCUS_ON_NETWORK = "focus_on_network"
+    SEARCH_FOR_RCE = "search_for_rce"
+```
+
+### FuzzingMemory
+
+Persistent knowledge storage.
+
+```python
+class FuzzingMemory:
+    def __init__(self, storage_path: Path)
+    
+    def record_campaign(
+        self,
+        binary_path: Path,
+        strategy: str,
+        outcome: Dict[str, Any]
+    ) -> None
+    
+    def get_successful_strategies(
+        self,
+        binary_path: Path
+    ) -> List[str]
+    
+    def get_similar_campaigns(
+        self,
+        binary_path: Path,
+        limit: int = 5
+    ) -> List[Dict[str, Any]]
+    
+    def save(self) -> None
+```
+
+### MultiTurnAnalyser
+
+Deep multi-turn LLM reasoning.
+
+```python
+class MultiTurnAnalyser:
+    def __init__(
+        self,
+        repo_path: Path,
+        out_dir: Path,
+        llm_config: Optional[LLMConfig] = None
+    )
+    
+    def analyze_vulnerability(
+        self,
+        finding_id: str,
+        initial_context: str,
+        max_turns: int = 5
+    ) -> Dict[str, Any]
+    
+    def analyze_crash(
+        self,
+        crash_context: CrashContext,
+        max_turns: int = 5
+    ) -> Dict[str, Any]
+```
+
+<ResponseField name="turns" type="int">
+  Number of LLM conversation turns
+</ResponseField>
+
+<ResponseField name="conversation" type="List[Dict]">
+  Full conversation history
+</ResponseField>
+
+<ResponseField name="conclusion" type="str">
+  Final analysis conclusion
+</ResponseField>
+
+<ResponseField name="confidence" type="float">
+  Confidence score (0.0-1.0)
+</ResponseField>
+
+<ResponseField name="reasoning_chain" type="List[str]">
+  Step-by-step reasoning
+</ResponseField>
+
+### GoalPlanner
+
+Goal-directed planning.
+
+```python
+class GoalPlanner:
+    def __init__(self, memory: Optional[FuzzingMemory] = None)
+    
+    def set_goal(
+        self,
+        goal_type: GoalType,
+        target: str,
+        constraints: Dict[str, Any] = None
+    ) -> Goal
+    
+    def plan_steps(
+        self,
+        goal: Goal,
+        current_state: FuzzingState
+    ) -> List[Action]
+    
+    def update_progress(
+        self,
+        goal: Goal,
+        state: FuzzingState
+    ) -> float
+```
+
+### GoalType
+
+Supported goal types.
+
+```python
+class GoalType(Enum):
+    RCE = "rce"                          # Remote code execution
+    INFO_LEAK = "info_leak"              # Information disclosure
+    PRIVILEGE_ESCALATION = "privesc"     # Privilege escalation
+    DOS = "dos"                          # Denial of service
+    AUTH_BYPASS = "auth_bypass"          # Authentication bypass
+    DATA_CORRUPTION = "data_corruption"  # Data integrity
+```
+
+## Autonomous Workflow
+
+### Complete Autonomous Campaign
+
+```python
+from packages.autonomous import (
+    FuzzingPlanner,
+    FuzzingState,
+    FuzzingMemory,
+    GoalPlanner,
+    GoalType
+)
+from packages.fuzzing import AFLRunner
+from packages.binary_analysis import CrashAnalyser
+import time
+from pathlib import Path
+
+# 1. Initialize autonomous components
+memory = FuzzingMemory(Path(".raptor/memory"))
+planner = FuzzingPlanner(memory=memory)
+goal_planner = GoalPlanner(memory=memory)
+
+# 2. Set goal
+goal = goal_planner.set_goal(
+    goal_type=GoalType.RCE,
+    target="network_parser"
+)
+
+# 3. Initial state
+state = FuzzingState(
+    start_time=time.time(),
+    current_time=time.time(),
+    binary_path=Path("target"),
+    target_goal="RCE"
+)
+
+# 4. Autonomous fuzzing loop
+runner = AFLRunner(binary_path=Path("target"))
+analyser = CrashAnalyser(Path("target"))
+
+while True:
+    # Decide next action
+    action = planner.decide_next_action(state)
+    print(f"\n[DECISION] {action}")
+    print(f"[REASONING] {planner.get_reasoning()}")
+    
+    # Execute action
+    if action == Action.CONTINUE_FUZZING:
+        result = runner.run_single_fuzzer(duration_seconds=60)
+        
+        # Update state
+        state.current_time = time.time()
+        state.total_execs += result['total_execs']
+        state.total_crashes += result['crashes']
+        
+        # Check goal progress
+        progress = goal_planner.update_progress(goal, state)
+        print(f"[PROGRESS] Goal: {progress:.1%}")
+        
+    elif action == Action.DEEP_ANALYSE_CRASH:
+        # Analyze crashes deeply
+        crashes = runner.collect_crashes()
+        for crash in crashes[:3]:
+            context = analyser.analyze_crash(crash.input_file, crash.signal)
+            if context.exploitability == "exploitable":
+                print(f"[FOUND] Exploitable crash: {crash.crash_id}")
+                planner.record_success(action, state)
+                break
+                
+    elif action == Action.STOP_FUZZING:
+        print("[COMPLETE] Autonomous fuzzing complete")
+        break
+    
+    # Record outcome
+    if state.exploitable_crashes > 0:
+        planner.record_success(action, state)
+    
+    # Sleep between iterations
+    time.sleep(5)
+
+# 5. Save learned knowledge
+memory.save()
+print(f"\n[SAVED] Knowledge persisted for future campaigns")
+```
+
+## Decision Making
+
+### Example Decision Tree
+
+The planner uses reasoning like:
+
+```python
+# Priority 1: Found interesting crashes recently
+if state.crashes_last_minute > 0:
+    return Action.CONTINUE_FUZZING  # Keep going!
+
+# Priority 2: Coverage has stalled
+elif state.is_coverage_stalled(threshold_seconds=300):
+    if state.current_strategy == "default":
+        return Action.CHANGE_MUTATOR  # Try different approach
+    else:
+        return Action.ADD_DICTIONARY  # Add structure
+
+# Priority 3: Goal progress
+elif state.target_goal and goal_progress < 0.5:
+    return goal_planner.next_action(goal, state)
+
+# Priority 4: Time limit
+elif state.elapsed_time() > 3600:  # 1 hour
+    return Action.STOP_FUZZING
+
+# Default: Keep fuzzing
+else:
+    return Action.CONTINUE_FUZZING
+```
+
+## Multi-Turn Analysis
+
+### Deep Reasoning Example
+
+```python
+from packages.autonomous import MultiTurnAnalyser
+
+analyser = MultiTurnAnalyser(
+    repo_path=Path("/path/to/code"),
+    out_dir=Path("out/analysis")
+)
+
+# Turn 1: Initial assessment
+# "Is this SQL injection exploitable?"
+
+# Turn 2: Follow-up question
+# "What sanitization is present?"
+
+# Turn 3: Validation
+# "Can we bypass the sanitization?"
+
+# Turn 4: Exploit strategy
+# "What's the exploitation path?"
+
+# Turn 5: Conclusion
+# "Final exploitability verdict"
+
+result = analyser.analyze_vulnerability(
+    finding_id="sqli-001",
+    initial_context="SQL injection in login form",
+    max_turns=5
+)
+
+print("\n=== Multi-Turn Analysis ===")
+for i, turn in enumerate(result['conversation'], 1):
+    print(f"\nTurn {i}:")
+    print(f"Q: {turn['question']}")
+    print(f"A: {turn['answer'][:200]}...")
+
+print(f"\n=== Conclusion ===")
+print(result['conclusion'])
+print(f"Confidence: {result['confidence']:.1%}")
+```
+
+## Corpus Generation
+
+### Intelligent Seed Generation
+
+```python
+from packages.autonomous import CorpusGenerator
+from pathlib import Path
+
+generator = CorpusGenerator(
+    target_binary=Path("target"),
+    output_dir=Path("corpus/"),
+    use_llm=True  # LLM-guided generation
+)
+
+# Generate seeds based on binary analysis
+seeds = generator.generate_intelligent_seeds(
+    num_seeds=50,
+    focus="parser"  # Focus on parser inputs
+)
+
+print(f"Generated {len(seeds)} intelligent seeds")
+```
+
+### LLM-Guided Generation
+
+```python
+# Use LLM to understand input format
+seeds = generator.generate_from_format_analysis(
+    sample_inputs=[Path("sample1.txt"), Path("sample2.txt")],
+    num_variants=20
+)
+```
+
+## Exploit Validation
+
+### Validate Generated Exploits
+
+```python
+from packages.autonomous import ExploitValidator, ValidationResult
+from pathlib import Path
+
+validator = ExploitValidator(
+    binary_path=Path("target"),
+    timeout=30
+)
+
+# Validate exploit code
+exploit_code = """
+#!/usr/bin/env python3
+import socket
+# ... exploit code ...
+"""
+
+result = validator.validate_exploit(
+    exploit_code=exploit_code,
+    expected_outcome="shell"
+)
+
+if result.success:
+    print("Exploit validated successfully!")
+    print(f"Outcome: {result.outcome}")
+    print(f"Evidence: {result.evidence}")
+else:
+    print(f"Exploit failed: {result.error}")
+```
+
+## Memory Persistence
+
+### Knowledge Storage
+
+```python
+memory = FuzzingMemory(Path(".raptor/memory"))
+
+# Record successful campaign
+memory.record_campaign(
+    binary_path=Path("target"),
+    strategy="havoc_with_dict",
+    outcome={
+        "crashes": 15,
+        "exploitable": 3,
+        "duration": 3600,
+        "coverage": 12500
+    }
+)
+
+# Query past success
+successful = memory.get_successful_strategies(
+    binary_path=Path("similar_target")
+)
+
+print(f"Previously successful strategies: {successful}")
+```
+
+### Similar Campaign Lookup
+
+```python
+# Find similar past campaigns
+similar = memory.get_similar_campaigns(
+    binary_path=Path("new_target"),
+    limit=5
+)
+
+for campaign in similar:
+    print(f"Binary: {campaign['binary']}")
+    print(f"Strategy: {campaign['strategy']}")
+    print(f"Success rate: {campaign['success_rate']}")
+```
+
+## Goal-Directed Behavior
+
+### Set and Track Goals
+
+```python
+from packages.autonomous import GoalPlanner, GoalType, Goal
+
+goal_planner = GoalPlanner()
+
+# Set RCE goal
+goal = goal_planner.set_goal(
+    goal_type=GoalType.RCE,
+    target="network_parser",
+    constraints={
+        "max_time": 7200,  # 2 hours
+        "max_attempts": 100
+    }
+)
+
+# Plan steps to achieve goal
+steps = goal_planner.plan_steps(goal, current_state)
+
+for i, step in enumerate(steps, 1):
+    print(f"Step {i}: {step}")
+
+# Track progress
+progress = goal_planner.update_progress(goal, current_state)
+print(f"Goal progress: {progress:.1%}")
+```
+
+## Configuration
+
+### Planner Configuration
+
+```python
+# Customize decision thresholds
+planner = FuzzingPlanner(memory=memory)
+planner.coverage_stall_threshold = 600  # 10 minutes
+planner.min_crashes_per_minute = 1
+planner.max_campaign_duration = 7200    # 2 hours
+```
+
+### Memory Configuration
+
+```python
+memory = FuzzingMemory(
+    storage_path=Path(".raptor/memory"),
+    max_campaigns=100,  # Keep last 100 campaigns
+    similarity_threshold=0.7
+)
+```
+
+## Integration
+
+### With Fuzzing
+
+```python
+from packages.fuzzing import AFLRunner
+from packages.autonomous import FuzzingPlanner, FuzzingState
+
+# Replace fixed duration with autonomous decisions
+runner = AFLRunner(...)
+planner = FuzzingPlanner()
+state = FuzzingState(...)
+
+while planner.decide_next_action(state) != Action.STOP_FUZZING:
+    runner.run_single_fuzzer(duration_seconds=60)
+    # Update state...
+```
+
+### With LLM Analysis
+
+```python
+from packages.llm_analysis import AutonomousSecurityAgentV2
+from packages.autonomous import MultiTurnAnalyser
+
+# Use multi-turn for complex vulnerabilities
+analyser = MultiTurnAnalyser(...)
+result = analyser.analyze_vulnerability(...)
+
+# Then generate exploit
+agent = AutonomousSecurityAgentV2(...)
+exploit = agent.generate_exploit(...)
+```
+
+## Related Packages
+
+- [Fuzzing](/api/packages/fuzzing) - Fuzzing campaigns
+- [LLM Analysis](/api/packages/llm-analysis) - AI-powered analysis
+- [Binary Analysis](/api/packages/binary-analysis) - Crash analysis
+
+## Performance
+
+### Decision Speed
+
+- **Decision making**: &lt;100ms per decision
+- **Memory lookup**: &lt;50ms per query
+- **Multi-turn analysis**: 30-120 seconds (depends on turns)
+
+## Best Practices
+
+1. **Enable memory** for learning across campaigns
+2. **Set clear goals** for focused testing
+3. **Use multi-turn** for complex vulnerabilities
+4. **Record outcomes** for continuous improvement
+5. **Let the planner decide** - don't override without reason

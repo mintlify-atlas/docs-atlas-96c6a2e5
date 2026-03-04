@@ -1,0 +1,354 @@
+---
+title: Expert Personas Overview
+description: Specialized expert methodologies for security research in RAPTOR
+---
+
+RAPTOR provides expert personas that embody specialized security research methodologies. These personas are extracted from RAPTOR's Python codebase and made explicitly available for manual guidance and review.
+
+## What Are Personas?
+
+Personas are specialized expert methodologies that:
+
+- **Embody real expertise**: Based on named security researchers and their approaches
+- **Provide structured frameworks**: Step-by-step methodologies for specific tasks
+- **Already exist in Python**: These are reference docs for internal Python methodologies
+- **Load on-demand**: Not automatically loaded - invoked only when needed
+
+<Info>
+  These personas already exist in RAPTOR's Python code. This documentation makes them accessible to Claude Code users for manual guidance and review.
+</Info>
+
+## Available Personas
+
+<CardGroup cols={2}>
+  <Card title="Exploit Developer" icon="code" href="/api/personas/exploit-developer">
+    **Mark Dowd methodology**
+    
+    Generate working exploit proof-of-concepts (C++, Python, JavaScript)
+    
+    Token cost: ~650t
+  </Card>
+  
+  <Card title="Crash Analyst" icon="microscope" href="/api/personas/crash-analyst">
+    **Charlie Miller / Halvar Flake tradition**
+    
+    Binary crash analysis and exploitability assessment
+    
+    Token cost: ~700t
+  </Card>
+  
+  <Card title="CodeQL Analyst" icon="magnifying-glass-chart" href="/api/personas/codeql-analyst">
+    **Dataflow expert**
+    
+    CodeQL dataflow path validation and false positive detection
+    
+    Token cost: ~400t
+  </Card>
+  
+  <Card title="Fuzzing Strategist" icon="chess" href="/api/personas/fuzzing-strategist">
+    **Expert strategist**
+    
+    AFL++ fuzzing decisions and parameter tuning
+    
+    Token cost: ~300t
+  </Card>
+  
+  <Card title="Binary Exploitation Specialist" icon="terminal" href="/api/personas/binary-exploitation-specialist">
+    **Binary expert**
+    
+    Crash exploit generation with structured output
+    
+    Token cost: ~400t
+  </Card>
+</CardGroup>
+
+## Persona vs Agent
+
+**Agents**:
+- Autonomous task orchestrators
+- Spawn other agents and manage workflows
+- Create working directories and artifacts
+- Examples: crash-analysis-agent, oss-forensics-agent
+
+**Personas**:
+- Expert methodologies and frameworks
+- Loaded on-demand for specific analysis tasks
+- Apply specialized knowledge to user questions
+- Examples: Exploit Developer, Crash Analyst
+
+## How to Use Personas
+
+### Explicit Invocation Only
+
+Personas are **NOT auto-loaded**. Invoke them explicitly when needed:
+
+<CodeGroup>
+```bash Exploit Development
+"Use exploit developer persona to create PoC for SQLi in login.php"
+```
+
+```bash Crash Analysis
+"Use crash analyst persona to analyze this SIGSEGV crash"
+```
+
+```bash CodeQL Validation
+"Use codeql analyst persona to validate this dataflow finding"
+```
+
+```bash Fuzzing Decisions
+"Use fuzzing strategist persona to recommend AFL parameters"
+```
+</CodeGroup>
+
+### What Happens
+
+<Steps>
+  <Step title="Persona Loads">
+    Claude loads the persona file from `tiers/personas/[name].md`
+  </Step>
+  
+  <Step title="Framework Applied">
+    The persona's methodology framework is applied to the problem
+  </Step>
+  
+  <Step title="Expert Analysis">
+    Analysis performed using expert criteria and structured approach
+  </Step>
+  
+  <Step title="Structured Output">
+    Returns structured verdict, code, or recommendations
+  </Step>
+</Steps>
+
+## Token Cost
+
+<Info>
+  Personas have zero token cost until explicitly invoked.
+</Info>
+
+| Persona | Token Cost | When Loaded |
+|---------|------------|-------------|
+| Exploit Developer | ~650t | When invoked |
+| Crash Analyst | ~700t | When invoked |
+| Security Researcher | ~620t | When invoked |
+| Patch Engineer | ~400t | When invoked |
+| Penetration Tester | ~350t | When invoked |
+| Fuzzing Strategist | ~300t | When invoked |
+| Binary Exploitation Specialist | ~400t | When invoked |
+| CodeQL Analyst | ~400t | When invoked |
+
+**Session impact**: Only when explicitly requested
+
+## Integration with Python
+
+**Python already uses these personas internally**:
+
+<Tabs>
+  <Tab title="agent.py">
+    ```python
+    # packages/llm_analysis/agent.py
+    # Uses: Security Researcher + Exploit Developer personas
+    ```
+    
+    For vulnerability validation and exploit generation
+  </Tab>
+  
+  <Tab title="crash_agent.py">
+    ```python
+    # packages/llm_analysis/crash_agent.py
+    # Uses: Crash Analyst + Binary Exploitation Specialist personas
+    ```
+    
+    For crash analysis and binary exploit generation
+  </Tab>
+  
+  <Tab title="dataflow_validator.py">
+    ```python
+    # packages/codeql/dataflow_validator.py
+    # Uses: CodeQL Analyst persona
+    ```
+    
+    For CodeQL finding validation
+  </Tab>
+</Tabs>
+
+<Warning>
+  These files make Python's internal methodologies explicit and user-accessible. No Python code changes needed - personas are reference documentation only.
+</Warning>
+
+## When to Use Each Persona
+
+<AccordionGroup>
+  <Accordion title="Exploit Developer">
+    **Use when:**
+    - Generating working exploit code (not templates)
+    - Creating proof-of-concept demonstrations
+    - Fixing broken or placeholder exploits
+    - Need compilable, executable code
+    
+    **Don't use when:**
+    - Just need theoretical analysis
+    - Want recommendations instead of code
+  </Accordion>
+
+  <Accordion title="Crash Analyst">
+    **Use when:**
+    - Analyzing AFL++ crashes
+    - Assessing binary exploitability
+    - Understanding crash types and primitives
+    - Need exploitability classification
+    
+    **Don't use when:**
+    - Source code vulnerability analysis
+    - Web application testing
+  </Accordion>
+
+  <Accordion title="CodeQL Analyst">
+    **Use when:**
+    - Validating CodeQL findings
+    - Detecting false positives in dataflow analysis
+    - Assessing sanitizer effectiveness
+    - Source-to-sink path validation
+    
+    **Don't use when:**
+    - Binary analysis
+    - Runtime crash analysis
+  </Accordion>
+
+  <Accordion title="Fuzzing Strategist">
+    **Use when:**
+    - Choosing AFL++ parameters
+    - Deciding corpus strategy
+    - Prioritizing crashes for analysis
+    - Making fuzzing campaign decisions
+    
+    **Don't use when:**
+    - Analyzing individual crashes
+    - Exploit development
+  </Accordion>
+
+  <Accordion title="Binary Exploitation Specialist">
+    **Use when:**
+    - Generating binary exploits from crashes
+    - Need structured JSON output format
+    - Must execute target binary in exploit
+    - Creating C++ exploitation code
+    
+    **Don't use when:**
+    - Web application exploits
+    - Script-based vulnerabilities
+  </Accordion>
+</AccordionGroup>
+
+## Persona Methodologies
+
+### Security Researcher Framework
+
+<Steps>
+  <Step title="Source Control">
+    Is the source attacker-controlled?
+  </Step>
+  
+  <Step title="Sanitizer Analysis">
+    Is sanitization effective or bypassable?
+  </Step>
+  
+  <Step title="Reachability">
+    Can an attacker trigger this code path?
+  </Step>
+  
+  <Step title="Impact Assessment">
+    What damage can be achieved?
+  </Step>
+</Steps>
+
+### Exploit Developer Principles
+
+<Checklist>
+  - [ ] Working code ONLY (no TODOs)
+  - [ ] Complete and compilable
+  - [ ] Safe for authorized testing
+  - [ ] Well documented
+  - [ ] Honest about limitations
+</Checklist>
+
+### Crash Analyst Framework
+
+<Steps>
+  <Step title="Signal Interpretation">
+    What does the crash signal indicate?
+  </Step>
+  
+  <Step title="Register Analysis">
+    Which registers are controlled?
+  </Step>
+  
+  <Step title="Exploit Primitives">
+    What primitives does this provide?
+  </Step>
+  
+  <Step title="Mitigations Check">
+    What protections are in place?
+  </Step>
+  
+  <Step title="Feasibility Classification">
+    Trivial, Moderate, Complex, or Infeasible?
+  </Step>
+</Steps>
+
+## Quality Standards
+
+All personas enforce these quality standards:
+
+<Tabs>
+  <Tab title="DO">
+    - Generate compilable code (test syntax)
+    - Include complete imports and error handling
+    - Document each step with comments
+    - Provide usage instructions
+    - State prerequisites and limitations
+    - Demonstrate actual impact (not theoretical)
+  </Tab>
+  
+  <Tab title="DON'T">
+    - Include TODO comments (code must be complete)
+    - Generate template/placeholder code
+    - Skip error handling
+    - Assume tools/libraries available
+    - Create destructive payloads
+    - Generate weaponized code
+  </Tab>
+</Tabs>
+
+## Future Expansion
+
+Reserved space for additional personas:
+
+- `security_researcher.md` (vulnerability validation framework)
+- `patch_engineer.md` (secure patch creation)
+- `penetration_tester.md` (web payload generation)
+- `offensive_security_researcher.md` (research methodology)
+
+<Info>
+  Add personas when needed, not preemptively.
+</Info>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Exploit Developer" icon="code" href="/api/personas/exploit-developer">
+    Learn Mark Dowd's exploit development methodology
+  </Card>
+  
+  <Card title="Crash Analyst" icon="microscope" href="/api/personas/crash-analyst">
+    Explore binary crash analysis frameworks
+  </Card>
+  
+  <Card title="CodeQL Analyst" icon="magnifying-glass-chart" href="/api/personas/codeql-analyst">
+    Master dataflow validation techniques
+  </Card>
+  
+  <Card title="Agent System" icon="robot" href="/api/agents/overview">
+    Return to agent system overview
+  </Card>
+</CardGroup>

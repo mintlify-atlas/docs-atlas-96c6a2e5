@@ -1,0 +1,600 @@
+---
+title: Claude Code Integration
+description: Interactive security testing with Claude Code slash commands and expert personas
+icon: comments
+---
+
+RAPTOR integrates seamlessly with Claude Code, providing an interactive conversational interface for security testing. Use slash commands to trigger analyses and invoke expert personas for specialized guidance.
+
+## Available Slash Commands
+
+RAPTOR provides six core slash commands for security testing:
+
+<CardGroup cols={2}>
+  <Card title="/scan" icon="magnifying-glass">
+    Static code analysis with Semgrep and CodeQL
+  </Card>
+  <Card title="/fuzz" icon="bug">
+    Binary fuzzing with AFL++ and crash analysis
+  </Card>
+  <Card title="/web" icon="globe">
+    Web application security testing (OWASP Top 10)
+  </Card>
+  <Card title="/agentic" icon="robot">
+    Full autonomous workflow - most comprehensive
+  </Card>
+  <Card title="/codeql" icon="code">
+    CodeQL-only deep dataflow analysis
+  </Card>
+  <Card title="/analyze" icon="chart-line">
+    LLM analysis of existing SARIF files
+  </Card>
+</CardGroup>
+
+### Security Testing Commands
+
+#### /scan - Static Analysis
+
+Runs Semgrep for fast, focused scanning:
+
+```
+/scan
+```
+
+Claude executes `raptor.py scan` and presents findings prioritized by exploitability.
+
+#### /agentic - Full Autonomous Workflow
+
+The most comprehensive option - runs Semgrep, CodeQL, LLM analysis, exploit generation, and patch creation:
+
+```
+/agentic
+```
+
+This triggers the complete security testing pipeline with adversarial thinking prioritization.
+
+#### /codeql - Deep Analysis
+
+CodeQL-only analysis for complex dataflow vulnerabilities:
+
+```
+/codeql
+```
+
+Slower but finds complex issues that pattern-based tools miss.
+
+#### /fuzz - Binary Fuzzing
+
+Fuzz testing with AFL++ for binary targets:
+
+```
+/fuzz
+```
+
+Automatically analyzes crashes and generates exploits.
+
+#### /web - Web Security
+
+OWASP Top 10 testing for web applications:
+
+```
+/web
+```
+
+<Warning>
+The /web command is currently in alpha. It's a stub implementation and should not be relied upon for production testing.
+</Warning>
+
+#### /analyze - LLM Analysis
+
+Analyze existing SARIF files from previous scans or external tools:
+
+```
+/analyze
+```
+
+Skips scanning and focuses on LLM-powered vulnerability analysis.
+
+### Skill Management
+
+#### /create-skill - Save Custom Approaches
+
+Save successful custom approaches for reuse:
+
+```
+/create-skill
+```
+
+<Info>
+Skills are currently in **alpha**. Definition creation works, but auto-loading and execution integration are not yet implemented.
+</Info>
+
+## Interactive Workflow
+
+RAPTOR's Claude Code integration follows a conversational, decision-driven workflow:
+
+### Typical Session Flow
+
+```
+User: /scan
+
+Claude: [Executes raptor.py agentic]
+        [Scan completes]
+
+        Results: 15 vulnerabilities found
+
+        Analyzing with adversarial thinking:
+        - 2 Secrets (instant compromise) - REVIEW FIRST
+        - 5 SQLi (database access) - REVIEW SECOND  
+        - 3 Auth issues (broken access control) - REVIEW THIRD
+        - 5 Config issues - REVIEW LAST
+
+        What next?
+        1. Deep - Analyze top findings
+        2. Fix - Apply patches/improve exploits
+        3. Generate report - Export results
+        4. Retry - Different parameters
+        5. Done - Finish
+
+        Your choice? [1-5]
+
+User: 2
+
+Claude: Reviewing Python-generated patches...
+        Found 2 template patches. Using Patch Engineer persona...
+        ✓ All patches now production-ready
+        Apply patches? [Y/n]
+
+User: Y
+
+Claude: [Applies patches using Edit tool]
+        ✓ Patches applied successfully
+        Run /scan again to verify fixes? [Y/n]
+```
+
+### Progressive Context Loading
+
+RAPTOR uses progressive loading to minimize token usage:
+
+<Steps>
+  <Step title="Session Start: 360 tokens">
+    Loads CLAUDE.md with core instructions and command definitions
+  </Step>
+  <Step title="After Scan: 925 tokens">
+    Loads analysis-guidance.md for adversarial prioritization
+  </Step>
+  <Step title="With Persona: up to 1,625 tokens">
+    Loads expert persona (300-700 tokens) only when invoked
+  </Step>
+</Steps>
+
+This ensures minimal memory overhead while providing expert guidance on-demand.
+
+## Expert Personas
+
+RAPTOR includes nine expert personas that load on-demand (0 tokens until invoked):
+
+| Persona | Expert | Purpose | Token Cost |
+|---------|--------|---------|------------|
+| **Exploit Developer** | Mark Dowd | Generate working PoCs | ~650t |
+| **Crash Analyst** | Charlie Miller / Halvar Flake | Binary crash analysis | ~700t |
+| **Security Researcher** | Research methodology | Vulnerability validation | ~620t |
+| **Patch Engineer** | Senior security engineer | Secure patch creation | ~400t |
+| **Penetration Tester** | Senior pentester | Web payload generation | ~350t |
+| **Fuzzing Strategist** | Expert strategist | Fuzzing decisions | ~300t |
+| **Binary Exploitation Specialist** | Binary expert | Crash exploit generation | ~400t |
+| **CodeQL Dataflow Analyst** | Dataflow expert | Dataflow validation | ~400t |
+| **CodeQL Finding Analyst** | Mark Dowd methodology | CodeQL findings | ~350t |
+
+### How to Use Personas
+
+Invoke personas explicitly when you need specialized expertise:
+
+```
+"Use exploit developer persona to create PoC for finding #42"
+"Use crash analyst persona to analyze this crash"
+"Use fuzzing strategist persona to recommend AFL parameters"
+"Use patch engineer persona to create production-ready patch"
+```
+
+<Info>
+Personas are **NOT** auto-loaded. They only consume tokens when you explicitly request them.
+</Info>
+
+### Exploit Developer Persona
+
+Generates working, compilable exploit code (no placeholders or TODOs):
+
+```
+User: Finding #7 shows SQL injection. Use exploit developer persona to create a working PoC.
+
+Claude: [Loads exploit_developer.md - 650 tokens]
+        
+        Analyzing SQLi in login.php:42...
+        
+        ```python
+        #!/usr/bin/env python3
+        """
+        SQL Injection PoC for login.php
+        
+        Demonstrates authentication bypass via union-based SQLi
+        """
+        import requests
+        
+        TARGET = "http://target.com/login"
+        payload = "' OR 1=1 -- "
+        
+        response = requests.post(TARGET, data={
+            "username": payload,
+            "password": "x"
+        })
+        
+        if "admin" in response.text:
+            print("[+] SQLi successful - authentication bypassed")
+            print(f"[+] Response: {response.text[:200]}")
+        else:
+            print("[-] Exploit failed")
+        ```
+```
+
+### Patch Engineer Persona
+
+Creates production-ready secure patches (not recommendations):
+
+```
+User: Use patch engineer persona to fix the SQLi in login.php
+
+Claude: [Loads patch_engineer.md - 400 tokens]
+        
+        Creating secure patch for login.php:42...
+        
+        ```diff
+        --- login.php (original)
+        +++ login.php (patched)
+        @@ -40,3 +40,4 @@
+         function authenticate($username, $password) {
+        -    $query = "SELECT * FROM users WHERE name='$username'";
+        +    // Fixed: Use parameterized query to prevent SQL injection
+        +    $stmt = $pdo->prepare("SELECT * FROM users WHERE name=?");
+        +    $stmt->execute([$username]);
+        ```
+        
+        Test recommendations:
+        - Test with normal credentials
+        - Test with SQL injection payloads
+        - Verify no regression in login flow
+```
+
+### Security Researcher Persona
+
+Validates exploitability using a 4-step framework:
+
+<Steps>
+  <Step title="Source Control Analysis">
+    Is the data source attacker-controlled?
+  </Step>
+  <Step title="Sanitizer Analysis">
+    Are sanitizers effective or bypassable?
+  </Step>
+  <Step title="Reachability Analysis">
+    Can an attacker trigger this code path?
+  </Step>
+  <Step title="Impact Assessment">
+    What's the worst-case scenario?
+  </Step>
+</Steps>
+
+Use this persona to distinguish real vulnerabilities from false positives:
+
+```
+"Use security researcher persona to validate finding #12"
+"Is this actually exploitable or a false positive?"
+"Security researcher: analyze this sanitizer bypass"
+```
+
+### Crash Analyst Persona
+
+Analyzes binary crashes from fuzzing:
+
+```
+User: AFL++ found a crash with SIGSEGV at 0x4141414141. 
+      Use crash analyst persona to assess exploitability.
+
+Claude: [Loads crash_analyst.md - 700 tokens]
+        
+        CRASH ANALYSIS
+        
+        Signal: SIGSEGV (11)
+        Address: 0x4141414141 ('AAAA')
+        
+        ASSESSMENT:
+        
+        1. Crash Type: Buffer overflow - controlled write
+        2. Register State:
+           - RIP: 0x4141414141 ✓ Fully controlled
+           - RSP: Valid stack range
+           - RAX: Contains user data
+        
+        3. Exploit Primitives:
+           - Arbitrary code execution: YES
+           - Controlled jump: YES
+        
+        4. Mitigations:
+           - ASLR: Enabled (need info leak)
+           - DEP: Enabled (need ROP chain)
+           - Stack canary: Not present
+        
+        EXPLOITABILITY: HIGH (Moderate complexity)
+        
+        Strategy: ROP chain + info leak for ASLR bypass
+```
+
+## Adversarial Thinking
+
+RAPTOR prioritizes findings using an adversarial mindset:
+
+### Prioritization Formula
+
+```
+Priority = (Impact × Exploitability) / Detection Time
+```
+
+### Default Priority Order
+
+<AccordionGroup>
+  <Accordion title="1. Secrets - Instant Compromise" icon="key">
+    Hardcoded credentials, API keys, tokens - no exploitation needed, instant access
+  </Accordion>
+  <Accordion title="2. Input Validation - High Exploitability" icon="shield-xmark">
+    SQLi, XSS, command injection - common and highly exploitable
+  </Accordion>
+  <Accordion title="3. Authentication - Critical Impact" icon="lock-open">
+    Broken access control, authentication bypass - direct compromise
+  </Accordion>
+  <Accordion title="4. Cryptography - Data Protection" icon="fingerprint">
+    Weak algorithms, hardcoded keys - affects data security
+  </Accordion>
+  <Accordion title="5. Configuration - Security Baseline" icon="gear">
+    Debug mode, insecure defaults - environmental risks
+  </Accordion>
+</AccordionGroup>
+
+<Info>
+You can override the default priority order by telling Claude to use a different ranking based on your threat model.
+</Info>
+
+## Output Structure
+
+All results are saved to the `out/` directory:
+
+```
+out/scan_REPO_TIMESTAMP/
+├── semgrep_*.sarif              # Semgrep findings
+├── codeql_*.sarif               # CodeQL findings (if enabled)
+├── scan_metrics.json            # Statistics
+├── autonomous_analysis_report.json  # LLM analysis
+├── exploits/                    # Generated PoC code
+│   ├── exploit_001.py
+│   └── exploit_002.c
+└── patches/                     # Secure fixes
+    ├── patch_001.diff
+    └── patch_002.diff
+```
+
+### Accessing Results
+
+<Tabs>
+  <Tab title="Claude Code">
+    Claude automatically reads, analyzes, and presents results in a prioritized format
+  </Tab>
+  <Tab title="Python CLI">
+    Read files directly from the `out/` directory or parse SARIF with your own tools
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+### Placeholder Exploits (TODO Comments)
+
+**Issue:** Python generated template code instead of working exploits
+
+**Solution:** Use Exploit Developer persona
+
+```
+"Use exploit developer persona to create working exploit for finding #X"
+```
+
+### Template Patches
+
+**Issue:** Patches are recommendations, not actual code
+
+**Solution:** Use Patch Engineer persona
+
+```
+"Use patch engineer persona to create production-ready patch"
+```
+
+### No Findings Returned
+
+**Common Causes:**
+- Git not initialized (Semgrep needs `.git/` directory)
+- Wrong policy groups specified
+- Language not supported by scanners
+
+**Solution:** Ask Claude for help
+
+```
+User: Why didn't the scan find anything?
+
+Claude: Let me check:
+        - Git status: [checks if .git exists]
+        - Languages detected: [checks file types]
+        - Policy groups: [reviews configuration]
+```
+
+### LLM API Errors
+
+**Python handles automatic fallback:** Claude → GPT-4 → Ollama
+
+**Check:**
+
+```bash
+# Verify API key is set
+echo $ANTHROPIC_API_KEY
+
+# Check connectivity
+curl -I https://api.anthropic.com
+```
+
+<Warning>
+Ensure you have sufficient API credits before running autonomous analysis on large codebases.
+</Warning>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Start with /agentic" icon="rocket">
+    Use the comprehensive workflow for full coverage
+  </Card>
+  <Card title="Invoke personas explicitly" icon="user-tie">
+    Only load expert personas when you need specialized analysis
+  </Card>
+  <Card title="Review patches before applying" icon="eye">
+    Always inspect generated patches for correctness
+  </Card>
+  <Card title="Verify fixes with re-scan" icon="rotate">
+    Run `/scan` again after applying patches to confirm fixes
+  </Card>
+</CardGroup>
+
+### Progressive Workflow
+
+1. **Initial Scan:** Start with `/agentic` for comprehensive coverage
+2. **Review Findings:** Analyze prioritized results with adversarial thinking
+3. **Deep Analysis:** Use personas for specialized expertise
+4. **Generate Fixes:** Create patches with Patch Engineer persona
+5. **Apply & Verify:** Apply patches and re-scan to confirm
+6. **Report:** Generate final report with findings and remediations
+
+### Token Budget Management
+
+- **Baseline (360t):** Session start with CLAUDE.md
+- **Analysis (+565t):** Load analysis-guidance.md after scan
+- **Persona (+300-700t):** Only when explicitly requested
+- **Recovery (+200-400t):** Error recovery guidance if needed
+
+<Tip>
+Keep total context under 2,000 tokens for optimal performance by only loading personas when necessary.
+</Tip>
+
+## Real-World Examples
+
+### Example 1: Finding and Fixing SQLi
+
+```
+User: /scan
+
+Claude: Found 8 vulnerabilities:
+        - 2 SQL injection (HIGH)
+        - 3 XSS (MEDIUM)
+        - 3 Config issues (LOW)
+        
+        Top priority: SQLi in login.php:42
+
+User: Use security researcher persona to validate the SQLi
+
+Claude: EXPLOITABLE (High confidence)
+        - Source: HTTP POST parameter (attacker-controlled)
+        - Sanitizer: None (string concatenation)
+        - Reachability: Public endpoint
+        - Impact: Database access, auth bypass
+
+User: Create exploit and patch
+
+Claude: [Generates working Python PoC]
+        [Creates secure parameterized query patch]
+        
+        Apply patch now? [Y/n]
+
+User: Y
+
+Claude: ✓ Patch applied to login.php
+        ✓ Verified: No more string concatenation
+        Run /scan to verify? [Y/n]
+```
+
+### Example 2: Binary Fuzzing
+
+```
+User: /fuzz --binary ./target --duration 3600
+
+Claude: [Executes AFL++ for 1 hour]
+        
+        Results: 3 unique crashes
+        - crash_001: SIGSEGV at 0x4141414141 (controlled)
+        - crash_002: SIGSEGV at 0x00000000 (NULL deref)
+        - crash_003: SIGABRT from malloc (heap corruption)
+
+User: Use crash analyst persona for crash_001
+
+Claude: [Analyzes crash]
+        
+        EXPLOITABILITY: HIGH
+        - Buffer overflow with RIP control
+        - ASLR + DEP enabled
+        - Strategy: ROP chain + leak
+        
+        Generate exploit? [Y/n]
+
+User: Y
+
+Claude: [Creates C exploit with ROP chain]
+        ✓ Exploit saved to out/exploits/crash_001_exploit.c
+```
+
+### Example 3: Custom Skill Creation
+
+```
+User: I found that checking API authentication endpoints first
+      helps me find critical issues faster
+
+Claude: That's a valuable approach!
+
+User: /create-skill
+
+Claude: What successful approach should we save?
+
+User: Focus on API security - check auth endpoints first,
+      then rate limiting, then data validation
+
+Claude: [Extracts patterns]
+        [Validates token budget: 380 tokens]
+        
+        Skill: api_security_auth_focus
+        Triggers: API, authentication, auth bypass
+        
+        Create? [Y/n]
+
+User: Y
+
+Claude: ✓ Saved to: tiers/specialists/custom/api_security_auth_focus.md
+        
+        Note: Auto-loading not yet implemented (alpha feature)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Python CLI" icon="terminal" href="/guides/python-cli">
+    Learn direct command-line usage for scripting and CI/CD
+  </Card>
+  <Card title="Extending RAPTOR" icon="code-branch" href="/guides/extending-raptor">
+    Add custom security scanners and capabilities
+  </Card>
+  <Card title="Creating Personas" icon="user-plus" href="/guides/creating-personas">
+    Develop custom expert personas for your use cases
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/reference/configuration">
+    Configure RAPTOR for your environment
+  </Card>
+</CardGroup>

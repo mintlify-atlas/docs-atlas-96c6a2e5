@@ -1,80 +1,346 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick start
+description: Get started with RAPTOR in minutes using Claude Code or Python CLI
 ---
 
-## Get started in three steps
+## Overview
 
-Get your documentation site running locally and make your first customization.
+RAPTOR offers two interfaces:
 
-### Step 1: Set up your local environment
+- **Claude Code** (recommended): Natural language interface with interactive workflows
+- **Python CLI**: Command-line interface for scripting and CI/CD integration
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+This guide covers both approaches.
+
+## Claude Code quick start
+
+Use RAPTOR with plain English in Claude Code via slash commands.
+
+<Steps>
+  <Step title="Install Claude Code">
+    Download Claude Code from [https://claude.ai/download](https://claude.ai/download)
+  </Step>
+
+  <Step title="Clone and open RAPTOR">
+    ```bash
+    git clone https://github.com/gadievron/raptor.git
+    cd raptor
+    claude
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    Let Claude install dependencies for you:
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    ```
+    "Install dependencies from requirements.txt"
+    "Install semgrep"
+    "Set my ANTHROPIC_API_KEY to [your-key]"
+    ```
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    <Note>
+    Check `DEPENDENCIES.md` for licenses of the various tools before installing.
+    </Note>
+  </Step>
 
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+  <Step title="Start using RAPTOR">
+    Just say "hi" to get started, then try:
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```
+    /scan - Scan code for vulnerabilities
+    /fuzz - Fuzz binaries (asks to install AFL++ if needed)
+    /web  - Test web applications
+    ```
+    
+    Try `/analyze` on one of the test cases in `/tests/data`
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+### Natural language examples
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+Just talk naturally to Claude:
 
-### Step 3: Go live
+#### Code scanning
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+```
+/scan - scan this directory
+/scan - find secrets in my code
+/scan - check for SQL injection vulnerabilities
+```
+
+#### Binary fuzzing
+
+```
+/fuzz - fuzz this binary
+/fuzz - test ./myapp for 5 minutes
+/fuzz - find crashes in /usr/local/bin/myapp
+```
+
+#### Web testing
+
+```
+/web - test my website
+/web - scan https://localhost:3000 for XSS
+/web - check this app for OWASP Top 10
+```
+
+<Note>
+The `/web` command is currently in alpha status. Treat as experimental.
+</Note>
+
+### Interactive workflow example
+
+Here's what a typical RAPTOR session looks like:
+
+```
+You: /scan - scan this code
+
+Claude: I'll scan the current directory with RAPTOR...
+        [Runs scan...]
+        Found 5 vulnerabilities!
+
+        1. SQL Injection (CRITICAL) - api/db.py:23
+           Generated exploit: out/exploits/sqli_001.py
+           Generated patch: out/patches/sqli_001.patch
+
+        Would you like me to:
+        1. Apply the patches?
+        2. Explain the SQL injection?
+        3. Show the exploit code?
+
+You: Show me the exploit
+
+Claude: [Reads and displays the exploit code]
+        This exploit works by...
+
+You: Apply the patch for that one
+
+Claude: [Applies the patch using Edit tool]
+        ✓ Patch applied! The SQL injection is now fixed.
+
+        Want me to scan again to verify the fix?
+```
+
+### Benefits of Claude Code interface
+
+- No command-line syntax to remember
+- AI understands your intent
+- Results explained in plain English
+- Interactive fix workflow
+- Fast and autonomous
+
+## Python CLI quick start
+
+For scripting or CI/CD integration, use the Python CLI directly.
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/gadievron/raptor.git
+    cd raptor
+    ```
+  </Step>
+
+  <Step title="Install Python dependencies">
+    ```bash
+    pip install -r requirements.txt
+    ```
+  </Step>
+
+  <Step title="Install external tools">
+    ```bash
+    # Install Semgrep
+    pip install semgrep
+    
+    # Optional: Install AFL++ for fuzzing
+    # macOS:
+    brew install afl++
+    
+    # Ubuntu/Debian:
+    sudo apt install afl++
+    ```
+  </Step>
+
+  <Step title="Configure LLM provider">
+    ```bash
+    # For Anthropic Claude (recommended)
+    export ANTHROPIC_API_KEY=your-key-here
+    
+    # For OpenAI
+    export OPENAI_API_KEY=your-key-here
+    
+    # For local Ollama (free)
+    export OLLAMA_HOST=http://localhost:11434
+    ```
+  </Step>
+
+  <Step title="Run your first scan">
+    ```bash
+    # Full autonomous workflow
+    python3 raptor.py agentic --repo /path/to/code
+    
+    # Static analysis only
+    python3 raptor.py scan --repo /path/to/code
+    
+    # Binary fuzzing
+    python3 raptor.py fuzz --binary /path/to/binary --duration 3600
+    ```
+  </Step>
+</Steps>
+
+### Python CLI examples
+
+<CodeGroup>
+
+```bash Scan repository
+# Scan for all vulnerabilities
+python3 raptor.py scan --repo /path/to/code
+
+# Scan for specific policy groups
+python3 raptor.py scan --repo /path/to/code --policy_groups secrets
+```
+
+```bash Full autonomous workflow
+# Scan, analyze, generate exploits and patches
+python3 raptor.py agentic --repo /path/to/code
+```
+
+```bash Binary fuzzing
+# Fuzz for 1 hour
+python3 raptor.py fuzz --binary /path/to/binary --duration 3600
+
+# Fuzz with custom input directory
+python3 raptor.py fuzz --binary /path/to/binary --input_dir ./seeds
+```
+
+```bash CodeQL analysis
+# Deep dataflow analysis
+python3 raptor.py codeql --repo /path/to/code
+```
+
+</CodeGroup>
+
+## Using the devcontainer
+
+A devcontainer with all prerequisites pre-installed is available for easy onboarding.
+
+<Steps>
+  <Step title="Open in VS Code">
+    Use the command **Dev Container: Open Folder in Container** in VS Code or any of its forks.
+  </Step>
+
+  <Step title="Or build with Docker">
+    ```bash
+    docker build -f .devcontainer/Dockerfile -t raptor-devcontainer:latest .
+    ```
+  </Step>
+</Steps>
+
+### What's included in the devcontainer
+
+**Pre-installed security tools:**
+- Semgrep (static analysis)
+- CodeQL CLI v2.15.5 (semantic code analysis)
+- AFL++ (fuzzing)
+- rr debugger (deterministic record-replay debugging)
+
+**Build & debugging tools:**
+- gcc, g++, clang-format, make, cmake, autotools
+- gdb, gdb-multiarch, binutils
+
+**Web testing (alpha):**
+- Playwright browser automation (Chromium, Firefox, Webkit browsers)
+
+<Info>
+The devcontainer is massive (~6GB), starting with Microsoft Python 3.12 devcontainer and adding static analysis, fuzzing, and browser automation tools.
+</Info>
+
+<Warning>
+The devcontainer runs with `--privileged` flag required for rr debugger.
+</Warning>
+
+## Available commands
+
+### Main entry point
+
+```
+/raptor   - RAPTOR security testing assistant (start here for guidance)
+```
+
+### Security testing
+
+```
+/scan     - Static code analysis (Semgrep + CodeQL)
+/fuzz     - Binary fuzzing with AFL++
+/web      - Web application security testing (alpha)
+/agentic  - Full autonomous workflow (analysis + exploit/patch generation)
+/codeql   - CodeQL-only deep analysis with dataflow
+/analyze  - LLM analysis only (no exploit/patch generation - 50% faster & cheaper)
+```
+
+### Exploit development & patching
+
+```
+/exploit  - Generate exploit proof-of-concepts (beta)
+/patch    - Generate security patches for vulnerabilities (beta)
+/crash-analysis - Analyze an FFmpeg crash and generate validated root-cause analysis
+```
+
+### Forensics & investigation
+
+```
+/oss-forensics - Evidence-backed forensic investigation for public GitHub repositories
+```
+
+### Development & testing
+
+```
+/create-skill    - Save custom approaches (experimental)
+/test-workflows  - Run comprehensive test suite (stub)
+```
+
+## Example output
+
+Here's what RAPTOR output looks like:
+
+```text
+╔═══════════════════════════════════════════════════════════════════════════╗ 
+║                                                                           ║
+║             ██████╗  █████╗ ██████╗ ████████╗ ██████╗ ██████╗             ║ 
+║             ██╔══██╗██╔══██╗██╔══██╗╚══██╔══╝██╔═══██╗██╔══██╗            ║ 
+║             ██████╔╝███████║██████╔╝   ██║   ██║   ██║██████╔╝            ║ 
+║             ██╔══██╗██╔══██║██╔═══╝    ██║   ██║   ██║██╔══██╗            ║ 
+║             ██║  ██║██║  ██║██║        ██║   ╚██████╔╝██║  ██║            ║ 
+║             ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝        ╚═╝    ╚═════╝ ╚═╝  ╚═╝            ║ 
+║                                                                           ║ 
+║             Autonomous Offensive/Defensive Research Framework             ║
+║             Based on Claude Code - v1.0-beta                              ║
+║                                                                           ║ 
+╚═══════════════════════════════════════════════════════════════════════════╝ 
+
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣤⣤⣀⣀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣾⣿⣿⠿⠿⠟
+⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣀⣀⣀⣀⣤⣴⣶⣶⣶⣤⣿⡿⠁⠀⠀⠀
+⣀⠤⠴⠒⠒⠛⠛⠛⠛⠛⠿⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠟⠁⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⣿⣿⣿⡟⠻⢿⡀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⢿⣿⠟⠀⠸⣊⡽⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⣿⡁⠀⠀⠀⠉⠁⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⠿⣿⣧⠀ Get them bugs.....
+```
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Installation" icon="download" href="/installation">
+    Detailed installation instructions and environment setup
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Learn about RAPTOR's technical architecture
+  </Card>
+  <Card title="Claude Code usage" icon="comments" href="/guides/claude-code-usage">
+    Complete guide to using RAPTOR with Claude Code
+  </Card>
+  <Card title="Python CLI" icon="terminal" href="/guides/python-cli">
+    Full Python command-line reference
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

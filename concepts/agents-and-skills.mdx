@@ -1,0 +1,593 @@
+---
+title: Multi-Agent System
+description: Understanding RAPTOR's 17 specialized agents and skills system for autonomous security testing
+---
+
+RAPTOR uses a multi-agent architecture where specialized agents handle specific security testing tasks. Agents are coordinated through the Claude Code integration and leverage reusable skills.
+
+## Agent Architecture
+
+Agents are defined in `.claude/agents/` and are invoked by the main orchestrators (`raptor.py`, `raptor_agentic.py`, `raptor_codeql.py`, `raptor_fuzzing.py`).
+
+### Agent Definition Format
+
+Each agent is defined with YAML frontmatter:
+
+```yaml
+---
+name: crash-analysis-agent
+description: Analyze security bugs from C/C++ projects with full root-cause tracing
+tools: Read, Write, Edit, Bash, Grep, Glob, WebFetch, WebSearch, Git, Task
+model: inherit
+skills: rr-debugger, function-tracing, gcov-coverage
+---
+```
+
+## The 17 Specialized Agents
+
+### Crash Analysis Agents
+
+#### crash-analysis-agent
+
+**Location:** `.claude/agents/crash-analysis-agent.md:1`
+
+**Purpose:** Main orchestrator for analyzing security bugs from C/C++ projects
+
+**Workflow:**
+1. Fetch bug report from tracker URL
+2. Clone repository to `./repo-<project-name>`
+3. Create working directory `./crash-analysis-<timestamp>/`
+4. Understand build system (autotools, CMake, Makefile, meson)
+5. Rebuild with instrumentation (AddressSanitizer, debug symbols)
+6. Reproduce the crash
+7. Generate execution trace (function-level)
+8. Generate coverage data (gcov)
+9. Create RR recording for deterministic replay
+10. Invoke crash-analyzer agent for root-cause analysis
+11. Validate analysis with crash-analyzer-checker agent
+12. Write confirmed hypothesis
+
+**Skills used:** `rr-debugger`, `function-tracing`, `gcov-coverage`
+
+#### crash-analyzer-agent
+
+**Purpose:** Deep root-cause analysis using rr traces
+
+**Approach:**
+- Analyze rr deterministic replay traces
+- Examine function execution traces
+- Review coverage data
+- Form hypotheses about root cause
+- Write hypothesis to `root-cause-hypothesis-YYY.md`
+
+#### crash-analyzer-checker-agent
+
+**Purpose:** Validates crash analysis rigorously
+
+**Approach:**
+- Review hypothesis against evidence
+- Check for logical inconsistencies
+- Verify claims against actual code
+- Write rebuttal file if hypothesis rejected
+- Iterate until validated (max 3 iterations)
+
+#### function-trace-generator-agent
+
+**Purpose:** Creates function-level execution traces
+
+**Method:**
+- Instruments code with `-finstrument-functions`
+- Captures function entry/exit events
+- Generates trace files in `<working-dir>/traces/`
+
+**Skill:** `function-tracing`
+
+#### coverage-analysis-generator-agent
+
+**Purpose:** Generates gcov coverage data
+
+**Method:**
+- Compiles with `--coverage` flags
+- Runs program to generate `.gcda` files
+- Produces coverage reports in `<working-dir>/gcov/`
+
+**Skill:** `gcov-coverage`
+
+### OSS Forensics Agents
+
+#### oss-investigator-gh-archive-agent
+
+**Location:** `.claude/agents/oss-investigator-gh-archive-agent.md:1`
+
+**Purpose:** Query GH Archive via BigQuery for tamper-proof forensic evidence
+
+**Responsibilities:**
+- Construct BigQuery queries for GitHub events
+- Execute queries for PushEvent, PullRequestEvent, IssuesEvent, etc.
+- Create evidence using `GHArchiveCollector`
+- Track which table each event came from
+- Store evidence in `evidence.json`
+
+**Key investigation patterns:**
+- Force push recovery (deleted commits)
+- Workflow vs Direct API attribution
+- Deleted tags/branches
+
+**Skills:** `github-archive`, `github-evidence-kit`
+
+#### oss-investigator-github-agent
+
+**Purpose:** Collect evidence from live GitHub API
+
+**Collects:**
+- Commits, issues, pull requests
+- Files, branches, tags, releases
+- Forks and repository metadata
+
+**Skills:** `github-evidence-kit`
+
+#### oss-investigator-local-git-agent
+
+**Purpose:** Analyze cloned repositories for forensic evidence
+
+**Key capability:**
+- Find dangling commits (not reachable from any ref)
+- Reveal force-pushed or deleted commits
+- Analyze local git history
+
+**Skills:** `github-evidence-kit`
+
+#### oss-investigator-wayback-agent
+
+**Purpose:** Recover deleted content from Wayback Machine
+
+**Collects:**
+- Archived snapshots of GitHub pages
+- Historical content with date filtering
+- Snapshot content retrieval
+
+**Skills:** `github-wayback-recovery`, `github-evidence-kit`
+
+#### oss-investigator-ioc-extractor-agent
+
+**Purpose:** Extract Indicators of Compromise from vendor reports
+
+**IOC types:**
+- COMMIT_SHA, FILE_PATH, FILE_HASH
+- CODE_SNIPPET, EMAIL, USERNAME
+- REPOSITORY, TAG_NAME, BRANCH_NAME
+- WORKFLOW_NAME, IP_ADDRESS, DOMAIN
+- URL, API_KEY, SECRET
+
+**Skills:** `github-evidence-kit`
+
+#### oss-hypothesis-former-agent
+
+**Purpose:** Form evidence-backed hypotheses
+
+**Approach:**
+- Analyze collected evidence
+- Identify patterns and anomalies
+- Form testable hypotheses
+- Document predictions
+
+#### oss-evidence-verifier-agent
+
+**Purpose:** Verify evidence against original sources
+
+**Method:**
+- Run `store.verify_all()` on evidence
+- Check for tampering or inconsistencies
+- Validate against GitHub API, GH Archive, Wayback
+- Report verification status
+
+**Skills:** `github-evidence-kit`
+
+#### oss-hypothesis-checker-agent
+
+**Purpose:** Validate claims against verified evidence
+
+**Approach:**
+- Review hypotheses
+- Check against verified evidence
+- Accept or reject based on evidence
+- Document reasoning
+
+#### oss-report-generator-agent
+
+**Purpose:** Produce final forensic report
+
+**Generates:**
+- Executive summary
+- Evidence timeline
+- Hypothesis validation results
+- Forensic conclusions
+- IOCs and recommendations
+
+**Output:** `.out/oss-forensics-<timestamp>/forensic-report.md`
+
+### Exploitability Validation Agent
+
+#### exploitability-validator-agent
+
+**Location:** `.claude/agents/exploitability-validator-agent.md:1`
+
+**Purpose:** Multi-stage pipeline to validate vulnerability findings are real, reachable, and exploitable
+
+**Workflow:**
+
+**Phase 0:** Initialize working directory
+
+**Phase 1 - Stage 0 (Inventory):**
+- Enumerate all files in target path
+- Exclude test/mock files
+- Extract functions per file
+- Write `checklist.json`
+
+**Phase 2 - Stage A (One-Shot):**
+- Assess each function for vulnerability type
+- Attempt PoC for candidates
+- Write `findings.json`
+- Route based on findings
+
+**Phase 3 - Stage B (Process):**
+- Build attack trees
+- Form and test hypotheses
+- Track PROXIMITY
+- Attempt multiple attack paths
+- Update working documents
+
+**Phase 4 - Stage C (Sanity Check):**
+- Verify files exist
+- Verify code matches verbatim
+- Verify flow is real
+- Verify code is reachable
+
+**Phase 5 - Stage D (Ruling):**
+- Check for test/mock/example code
+- Check for unrealistic preconditions
+- Check for hedging language
+- Write CONFIRMED findings
+
+**Phase 6 - Stage E (Feasibility):**
+- Applies to memory corruption only
+- Run `analyze_binary()` from exploit_feasibility package
+- Save context with `save_exploit_context()`
+- Update finding with feasibility verdict
+
+**Skills:** `exploitability-validation`
+
+### Offensive Security Specialist
+
+#### offsec-specialist
+
+**Location:** `.claude/agents/offsec-specialist.md:1`
+
+**Purpose:** General offensive security expertise
+
+**Capabilities:**
+- Penetration testing methodology
+- Exploit development guidance
+- Attack surface analysis
+- Security research techniques
+
+## Skills System
+
+Skills are reusable capabilities defined in `.claude/skills/` that agents can leverage.
+
+### Crash Analysis Skills
+
+#### rr-debugger
+
+**Location:** `.claude/skills/crash-analysis/rr-debugger/SKILL.md:1`
+
+**Purpose:** Deterministic debugging with rr record-replay
+
+**Core workflow:**
+
+```bash
+# Record
+rr record <program> [args]
+
+# Replay (enters gdb interface with reverse execution)
+rr replay
+```
+
+**Reverse execution commands:**
+- `reverse-next` / `rn` - Step back over function calls
+- `reverse-step` / `rs` - Step back into functions
+- `reverse-continue` / `rc` - Continue backward to previous breakpoint
+- `reverse-stepi` / `rsi` - Step back one instruction
+
+**Automation:** `scripts/crash_trace.py` automatically extracts execution trace before crash
+
+#### function-tracing
+
+**Location:** `.claude/skills/crash-analysis/function-tracing/SKILL.md:1`
+
+**Purpose:** Function instrumentation with `-finstrument-functions`
+
+**Files:**
+- `trace_instrument.c` - Instrumentation callbacks
+- `trace_to_perfetto.cpp` - Convert traces to Perfetto format
+
+**Usage:**
+
+```bash
+gcc -finstrument-functions -g program.c trace_instrument.c -o program
+./program
+# Generates trace.txt with function entry/exit events
+```
+
+#### gcov-coverage
+
+**Location:** `.claude/skills/crash-analysis/gcov-coverage/SKILL.md:1`
+
+**Purpose:** Code coverage collection
+
+**Usage:**
+
+```bash
+gcc --coverage -g program.c -o program
+./program
+gcov program.c
+# Generates program.c.gcov with line execution counts
+```
+
+#### line-execution-checker
+
+**Location:** `.claude/skills/crash-analysis/line-execution-checker/SKILL.md:1`
+
+**Purpose:** Fast line execution queries
+
+**File:** `line_checker.cpp` - Query if specific lines executed
+
+### OSS Forensics Skills
+
+#### github-evidence-kit
+
+**Location:** `.claude/skills/oss-forensics/github-evidence-kit/SKILL.md:1`
+
+**Purpose:** Generate, export, load, and verify forensic evidence from GitHub sources
+
+**Collectors:**
+
+```python
+from src.collectors import GitHubAPICollector, LocalGitCollector, GHArchiveCollector
+
+# GitHub API
+github = GitHubAPICollector()
+commit = github.collect_commit("owner", "repo", "sha")
+pr = github.collect_pull_request("owner", "repo", 123)
+
+# Local git (forensic gold!)
+local = LocalGitCollector("/path/to/repo")
+dangling = local.collect_dangling_commits()  # Force-pushed commits
+
+# GH Archive
+archive = GHArchiveCollector()
+events = archive.collect_events(timestamp="202507132037", repo="owner/repo")
+```
+
+**Evidence types:**
+- Events: PushEvent, PullRequestEvent, IssueEvent, etc.
+- Observations: CommitObservation, IssueObservation, FileObservation, etc.
+- IOCs: Indicators of Compromise with source verification
+
+**Verification:**
+
+```python
+from src import EvidenceStore
+
+store = EvidenceStore.load("evidence.json")
+is_valid, errors = store.verify_all()
+```
+
+#### github-archive
+
+**Location:** `.claude/skills/oss-forensics/github-archive/SKILL.md:1`
+
+**Purpose:** Query GH Archive via BigQuery
+
+**Requires:** `GOOGLE_APPLICATION_CREDENTIALS` for BigQuery
+
+**Event types:** All 12 GitHub event types (PushEvent, PullRequestEvent, CreateEvent, DeleteEvent, etc.)
+
+#### github-commit-recovery
+
+**Location:** `.claude/skills/oss-forensics/github-commit-recovery/SKILL.md:1`
+
+**Purpose:** Recover deleted commits from GH Archive
+
+**Method:**
+- Query GH Archive for force push events
+- Extract deleted commit SHAs from `payload.before`
+- Reconstruct commit metadata
+
+#### github-wayback-recovery
+
+**Location:** `.claude/skills/oss-forensics/github-wayback-recovery/SKILL.md:1`
+
+**Purpose:** Recover content from Wayback Machine
+
+**Method:**
+- Query Wayback CDX API for snapshots
+- Retrieve archived content
+- Extract historical state
+
+### Exploitability Validation Skill
+
+#### exploitability-validation
+
+**Location:** `.claude/skills/exploitability-validation/SKILL.md:1`
+
+**Purpose:** Multi-stage pipeline for validating vulnerability findings
+
+**Configuration:**
+
+```yaml
+models:
+  native: true
+  additional: false  # Set true to also run GPT, Gemini
+
+output_when_additional:
+  display: "agreement: 2/3"
+  threshold: "1/3 is enough to proceed"
+```
+
+**MUST-GATEs (apply to all stages):**
+
+1. **GATE-1 [ASSUME-EXPLOIT]:** Assume exploitable until proven otherwise
+2. **GATE-2 [STRICT-SEQUENCE]:** Strictly follow instructions
+3. **GATE-3 [CHECKLIST]:** Check pipeline, update checklist, collect evidence
+4. **GATE-4 [NO-HEDGING]:** Verify all uncertain claims immediately
+5. **GATE-5 [FULL-COVERAGE]:** Test entire codebase against checklist.json
+6. **GATE-6 [PROOF]:** Always provide proof and show vulnerable code
+
+**Stages:**
+
+| Stage | File | Purpose |
+|-------|------|----------|
+| 0 | `stage-0-inventory.md` | Build ground truth checklist |
+| A | `stage-a-oneshot.md` | Quick exploitability + PoC |
+| B | `stage-b-process.md` | Systematic analysis, attack trees |
+| C | `stage-c-sanity.md` | Validate against actual code |
+| D | `stage-d-ruling.md` | Filter preconditions/hedging |
+| E | `stage-e-feasibility.md` | Binary constraint analysis |
+
+**Working documents (Stage B):**
+- `attack-tree.json` - Knowledge graph, source of truth
+- `hypotheses.json` - Active hypotheses with status
+- `disproven.json` - Failed hypotheses and why
+- `attack-paths.json` - Paths attempted, PoC results, PROXIMITY, blockers
+- `attack-surface.json` - Sources, sinks, trust boundaries
+
+**Integration with exploit_feasibility:**
+
+Stage E automatically runs binary analysis for memory corruption:
+
+```python
+from packages.exploit_feasibility import analyze_binary, save_exploit_context
+
+result = analyze_binary(binary_path, vuln_type='format_string')
+context_file = save_exploit_context(binary_path)
+
+# Verdict: Likely, Difficult, Unlikely
+# chain_breaks: What won't work
+# what_would_help: What might work
+```
+
+### Exploit Development Skill
+
+#### exploit-dev
+
+**Location:** `.claude/skills/exploit-dev/instructions.md:1`
+
+**Purpose:** Exploit development guidance and templates
+
+**Coverage:**
+- Exploit code templates by vulnerability type
+- Constraint checking (ASLR, DEP, stack canaries, etc.)
+- Technique alternatives when standard approaches blocked
+- Environment recommendations (Docker, older glibc)
+
+## Agent Orchestration Patterns
+
+### Sequential Orchestration
+
+Used by `raptor_agentic.py` and `raptor_codeql.py`:
+
+```python
+# Phase 1: Scan
+scanner.run(repo_path)
+
+# Phase 2: Analyze
+analysis = llm_analyzer.analyze(findings)
+
+# Phase 3: Generate exploits
+for finding in analysis:
+    exploit = exploit_generator.generate(finding)
+```
+
+### Parallel Agent Invocation
+
+Used by `oss-forensics`:
+
+```python
+# Launch multiple investigators in parallel
+agents = [
+    Task("oss-investigator-gh-archive-agent", query),
+    Task("oss-investigator-github-agent", query),
+    Task("oss-investigator-local-git-agent", query)
+]
+
+# Collect results
+for agent in agents:
+    evidence.extend(agent.results)
+```
+
+### Iterative Refinement
+
+Used by `crash-analysis-agent`:
+
+```python
+max_iterations = 3
+for i in range(max_iterations):
+    hypothesis = crash_analyzer.analyze(crash_data)
+    validation = checker.validate(hypothesis)
+
+    if validation.accepted:
+        break
+
+    # Refine based on rebuttal
+    crash_data.add_feedback(validation.rebuttal)
+```
+
+## Agent Usage Examples
+
+### Crash Analysis
+
+```bash
+# Via raptor.py
+/crash-analysis https://bugs.project.org/1234 https://github.com/project/repo
+
+# Direct agent invocation
+claude-code .claude/agents/crash-analysis-agent.md \
+  --bug-url https://bugs.project.org/1234 \
+  --repo-url https://github.com/project/repo
+```
+
+### OSS Forensics
+
+```bash
+# Via raptor.py
+/oss-forensics "Investigate Amazon Q PR #7710" --max-followups 3
+
+# Output: .out/oss-forensics-<timestamp>/forensic-report.md
+```
+
+### Exploitability Validation
+
+```bash
+# Via raptor.py
+/validate /path/to/webapp --vuln-type command_injection
+
+# Direct agent invocation
+claude-code .claude/agents/exploitability-validator-agent.md \
+  /path/to/binary --vuln-type format_string
+
+# Output: .out/exploitability-validation-<timestamp>/validation-report.md
+```
+
+## Benefits of Multi-Agent Architecture
+
+1. **Specialization:** Each agent focuses on one specific task
+2. **Reusability:** Skills can be shared across multiple agents
+3. **Parallelization:** Independent agents can run in parallel
+4. **Testability:** Each agent can be tested in isolation
+5. **Extensibility:** New agents can be added without modifying existing ones
+6. **Clarity:** Clear separation of concerns and responsibilities
+
+<Tip>
+When creating new agents, follow the existing patterns: YAML frontmatter, clear purpose, specific skills, well-defined outputs.
+</Tip>

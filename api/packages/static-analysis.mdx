@@ -1,0 +1,325 @@
+---
+title: "Static Analysis"
+description: "Security vulnerability scanning using Semgrep and CodeQL with parallel execution"
+icon: "magnifying-glass-chart"
+---
+
+## Overview
+
+The Static Analysis package provides automated security vulnerability scanning using Semgrep rules and optional CodeQL integration. It features parallel scanning, policy-based rule selection, and SARIF output for unified vulnerability processing.
+
+## Purpose
+
+Scan source code repositories for security vulnerabilities using:
+- **Semgrep**: Pattern-based static analysis with custom and standard rule packs
+- **CodeQL**: Advanced semantic analysis (optional)
+- **Parallel execution**: Multiple scans run concurrently for speed
+- **Policy groups**: Organized rule categories (crypto, secrets, injection, auth)
+- **SARIF output**: Standardized format for downstream processing
+
+## Main Entry Point
+
+### `main()`
+
+CLI entry point for automated code security scanning.
+
+```python
+from packages.static_analysis import main
+
+main()  # Uses command-line arguments
+```
+
+## CLI Usage
+
+### Basic Scan
+
+```bash
+# Scan a local repository
+python3 -m packages.static_analysis.scanner \
+  --repo /path/to/code \
+  --policy_groups crypto,secrets,injection
+
+# Scan from Git URL
+python3 -m packages.static_analysis.scanner \
+  --repo https://github.com/org/repo \
+  --policy_groups all
+```
+
+### With CodeQL
+
+```bash
+# Include CodeQL analysis
+python3 -m packages.static_analysis.scanner \
+  --repo /path/to/code \
+  --policy_groups all \
+  --codeql
+```
+
+### Advanced Options
+
+```bash
+# Sequential scanning (for debugging)
+python3 -m packages.static_analysis.scanner \
+  --repo /path/to/code \
+  --policy_groups crypto,injection \
+  --sequential
+
+# Keep temporary directory
+python3 -m packages.static_analysis.scanner \
+  --repo /path/to/code \
+  --policy_groups all \
+  --keep
+```
+
+## Python API
+
+### Parallel Scanning
+
+```python
+from pathlib import Path
+from packages.static_analysis.scanner import semgrep_scan_parallel
+from core.config import RaptorConfig
+
+repo_path = Path("/path/to/code")
+rules_dirs = [
+    str(RaptorConfig.SEMGREP_RULES_DIR / "crypto"),
+    str(RaptorConfig.SEMGREP_RULES_DIR / "injection"),
+]
+out_dir = Path("out/scan_results")
+
+# Run parallel scans
+sarif_files = semgrep_scan_parallel(
+    repo_path=repo_path,
+    rules_dirs=rules_dirs,
+    out_dir=out_dir,
+    timeout=1800,
+    progress_callback=lambda msg: print(f"[+] {msg}")
+)
+
+print(f"Generated {len(sarif_files)} SARIF files")
+```
+
+### Sequential Scanning
+
+```python
+from packages.static_analysis.scanner import semgrep_scan_sequential
+
+# Use sequential mode for debugging
+sarif_files = semgrep_scan_sequential(
+    repo_path=repo_path,
+    rules_dirs=rules_dirs,
+    out_dir=out_dir,
+    timeout=1800
+)
+```
+
+### Safe Repository Cloning
+
+```python
+from packages.static_analysis.scanner import safe_clone
+from pathlib import Path
+import tempfile
+
+tmp = Path(tempfile.mkdtemp(prefix="raptor_scan_"))
+
+# Clones with URL validation
+repo_path = safe_clone(
+    url="https://github.com/org/repo",
+    workdir=tmp
+)
+
+print(f"Cloned to: {repo_path}")
+```
+
+## Core Functions
+
+### `semgrep_scan_parallel()`
+
+Run Semgrep scans in parallel for improved performance.
+
+<ParamField path="repo_path" type="Path" required>
+  Path to repository to scan
+</ParamField>
+
+<ParamField path="rules_dirs" type="List[str]" required>
+  List of rule directory paths
+</ParamField>
+
+<ParamField path="out_dir" type="Path" required>
+  Output directory for SARIF results
+</ParamField>
+
+<ParamField path="timeout" type="int" default="1800">
+  Timeout per scan in seconds
+</ParamField>
+
+<ParamField path="progress_callback" type="Optional[Callable]">
+  Optional callback for progress updates
+</ParamField>
+
+<ResponseField name="sarif_paths" type="List[str]">
+  List of generated SARIF file paths
+</ResponseField>
+
+### `run_single_semgrep()`
+
+Run a single Semgrep scan (used internally by parallel scanner).
+
+<ParamField path="name" type="str" required>
+  Scan name (e.g., "category_crypto")
+</ParamField>
+
+<ParamField path="config" type="str" required>
+  Semgrep config (path or pack ID)
+</ParamField>
+
+<ParamField path="repo_path" type="Path" required>
+  Repository path
+</ParamField>
+
+<ParamField path="out_dir" type="Path" required>
+  Output directory
+</ParamField>
+
+<ParamField path="timeout" type="int" required>
+  Timeout in seconds
+</ParamField>
+
+<ResponseField name="result" type="Tuple[str, bool]">
+  Tuple of (sarif_path, success)
+</ResponseField>
+
+### `validate_repo_url()`
+
+Validate repository URL against allowed patterns.
+
+```python
+from packages.static_analysis.scanner import validate_repo_url
+
+# Returns True for valid URLs
+assert validate_repo_url("https://github.com/org/repo")
+assert validate_repo_url("git@github.com:org/repo.git")
+
+# Returns False for invalid URLs
+assert not validate_repo_url("file:///etc/passwd")
+```
+
+### `sha256_tree()`
+
+Generate SHA256 hash of directory tree for caching.
+
+```python
+from packages.static_analysis.scanner import sha256_tree
+from pathlib import Path
+
+repo_hash = sha256_tree(Path("/path/to/code"))
+print(f"Repository hash: {repo_hash}")
+```
+
+## Configuration
+
+### Policy Groups
+
+Available policy groups in `RaptorConfig`:
+
+- **crypto**: Cryptographic vulnerabilities
+- **secrets**: Hardcoded secrets, API keys
+- **injection**: SQL injection, command injection, XSS
+- **auth**: Authentication and authorization flaws
+- **all**: All available rule categories
+
+### Environment Variables
+
+```bash
+# Semgrep rules directory
+export SEMGREP_RULES_DIR=/path/to/custom/rules
+
+# Output directory
+export RAPTOR_OUT_DIR=/path/to/output
+```
+
+### Timeouts
+
+Configured in `core/config.py`:
+
+```python
+SEMGREP_TIMEOUT = 1800          # Total timeout per scan
+SEMGREP_RULE_TIMEOUT = 300      # Timeout per rule
+GIT_CLONE_TIMEOUT = 600         # Git clone timeout
+MAX_SEMGREP_WORKERS = 4         # Parallel workers
+```
+
+## Output Structure
+
+```
+out/scan_{repo}_{timestamp}/
+├── semgrep_category_crypto.sarif      # Per-category SARIF
+├── semgrep_category_injection.sarif
+├── semgrep_baseline_security.sarif    # Baseline packs
+├── codeql_java.sarif                  # CodeQL (if --codeql)
+├── combined.sarif                     # Merged & deduplicated
+├── scan-manifest.json                 # Scan metadata
+├── scan_metrics.json                  # Finding metrics
+└── verification.json                  # Verification data
+```
+
+### Manifest Example
+
+```json
+{
+  "agent": "auto_codesec",
+  "version": "2.0.0",
+  "repo_path": "/path/to/repo",
+  "timestamp_utc": "2026-03-04T12:00:00Z",
+  "input_hash": "abc123...",
+  "policy_version": "1.0",
+  "policy_groups": ["crypto", "injection"],
+  "parallel_scanning": true
+}
+```
+
+### Metrics Example
+
+```json
+{
+  "total_findings": 47,
+  "total_files_scanned": 235,
+  "by_severity": {
+    "error": 12,
+    "warning": 28,
+    "note": 7
+  },
+  "by_category": {
+    "crypto": 8,
+    "injection": 15,
+    "secrets": 4
+  }
+}
+```
+
+## Related Packages
+
+- [CodeQL](/api/packages/codeql) - Advanced semantic analysis
+- [LLM Analysis](/api/packages/llm-analysis) - AI-powered vulnerability analysis
+- [Exploitability Validation](/api/packages/exploitability-validation) - Validate findings are exploitable
+
+## Performance
+
+### Parallel Scanning
+
+- **Small repos** (&lt;1K files): 2-5 minutes
+- **Medium repos** (1K-10K files): 5-15 minutes
+- **Large repos** (10K+ files): 15-30 minutes
+
+### Sequential vs Parallel
+
+- **Sequential**: 1 scan at a time (slower, easier to debug)
+- **Parallel**: Up to 4 scans simultaneously (4x faster)
+
+## Best Practices
+
+1. **Use parallel scanning** for production (default)
+2. **Select specific policy groups** for targeted analysis
+3. **Enable CodeQL** for comprehensive coverage
+4. **Merge SARIFs** for unified downstream processing
+5. **Cache results** using repository hash for repeat scans

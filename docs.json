@@ -1,122 +1,158 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "RAPTOR",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#fc5404",
+    "light": "#ee9c6c",
+    "dark": "#fc5404"
   },
-  "favicon": "/favicon.svg",
+  "logo": {
+    "light": "https://media.brand.dev/6812920c-293a-4123-b4c2-83df5afb32f4.svg",
+    "dark": "https://media.brand.dev/6812920c-293a-4123-b4c2-83df5afb32f4.svg"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/gadievron/raptor"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/gadievron/raptor"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/architecture",
+              "concepts/agents-and-skills",
+              "concepts/tiered-expertise",
+              "concepts/adversarial-thinking"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Security Testing",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "testing/static-analysis",
+              "testing/codeql",
+              "testing/binary-fuzzing",
+              "testing/web-scanning",
+              "testing/exploitability-validation"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Analysis & Exploitation",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "analysis/vulnerability-analysis",
+              "analysis/exploit-generation",
+              "analysis/patch-creation",
+              "analysis/crash-analysis"
+            ]
+          },
+          {
+            "group": "Advanced Features",
+            "pages": [
+              "advanced/oss-forensics",
+              "advanced/multi-agent-orchestration",
+              "advanced/cost-management",
+              "advanced/llm-configuration"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/claude-code-usage",
+              "guides/python-cli",
+              "guides/extending-raptor",
+              "guides/creating-personas"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Commands",
             "pages": [
-              "api-reference/introduction"
+              "api/commands/scan",
+              "api/commands/fuzz",
+              "api/commands/web",
+              "api/commands/agentic",
+              "api/commands/codeql",
+              "api/commands/analyze",
+              "api/commands/exploit",
+              "api/commands/patch",
+              "api/commands/validate",
+              "api/commands/crash-analysis",
+              "api/commands/oss-forensics"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Packages",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/packages/static-analysis",
+              "api/packages/codeql",
+              "api/packages/llm-analysis",
+              "api/packages/fuzzing",
+              "api/packages/binary-analysis",
+              "api/packages/exploitability-validation",
+              "api/packages/autonomous",
+              "api/packages/web"
+            ]
+          },
+          {
+            "group": "Agents",
+            "pages": [
+              "api/agents/overview",
+              "api/agents/offsec-specialist",
+              "api/agents/crash-analysis",
+              "api/agents/exploitability-validator",
+              "api/agents/oss-forensics"
+            ]
+          },
+          {
+            "group": "Expert Personas",
+            "pages": [
+              "api/personas/overview",
+              "api/personas/exploit-developer",
+              "api/personas/crash-analyst",
+              "api/personas/codeql-analyst",
+              "api/personas/fuzzing-strategist",
+              "api/personas/binary-exploitation-specialist"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Resources",
+        "groups": [
+          {
+            "group": "Resources",
+            "pages": [
+              "resources/dependencies",
+              "resources/devcontainer",
+              "resources/testing",
+              "resources/faq",
+              "resources/contributing"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

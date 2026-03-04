@@ -1,0 +1,510 @@
+---
+title: 'CodeQL Analysis'
+description: 'Semantic code analysis with automated database creation, query execution, and dataflow validation'
+---
+
+## Overview
+
+RAPTOR's CodeQL integration provides fully autonomous semantic analysis with automatic language detection, build system detection, database creation, and security query execution.
+
+## Architecture
+
+CodeQL analysis consists of multiple specialized components:
+
+```
+packages/codeql/
+├── agent.py                  # Main orchestrator
+├── language_detector.py      # Auto-detect languages
+├── build_detector.py         # Detect build systems
+├── database_manager.py       # Create/cache databases
+├── query_runner.py           # Execute security queries
+├── dataflow_validator.py     # Validate dataflow paths
+├── dataflow_visualizer.py    # Generate path visualizations
+└── autonomous_analyzer.py    # LLM-powered analysis
+```
+
+## Language Detection
+
+### Automatic Detection
+
+The language detector scans repositories and assigns confidence scores:
+
+```python
+from packages.codeql.language_detector import LanguageDetector
+
+detector = LanguageDetector(repo_path)
+detected = detector.detect_languages(min_files=3)
+
+for lang, info in detected.items():
+    print(f"{lang}: {info.file_count} files (confidence: {info.confidence:.2f})")
+```
+
+### Detection Algorithm
+
+Confidence scoring factors:
+
+1. **File extensions** (base: 0.3)
+2. **Build files** (+0.2 per file, max +0.4)
+3. **Structural indicators** (+0.1 per indicator, max +0.3)
+4. **File count ratio** (up to +0.3)
+
+### Supported Languages
+
+CodeQL-supported languages:
+
+| Language | Extensions | Build Files | Indicators |
+|----------|------------|-------------|------------|
+| Java | `.java` | `pom.xml`, `build.gradle` | `src/main/java/` |
+| Python | `.py` | `setup.py`, `pyproject.toml` | `__init__.py` |
+| JavaScript | `.js`, `.jsx`, `.mjs` | `package.json`, `yarn.lock` | `node_modules/` |
+| TypeScript | `.ts`, `.tsx` | `tsconfig.json` | `src/`, `dist/` |
+| Go | `.go` | `go.mod`, `go.sum` | `main.go`, `cmd/` |
+| C/C++ | `.c`, `.cpp`, `.h`, `.hpp` | `CMakeLists.txt`, `Makefile` | `src/`, `include/` |
+| C# | `.cs` | `.csproj`, `.sln` | `Properties/`, `bin/` |
+| Ruby | `.rb` | `Gemfile`, `Rakefile` | `lib/`, `spec/` |
+| Swift | `.swift` | `Package.swift`, `Podfile` | `Sources/`, `Tests/` |
+| Kotlin | `.kt`, `.kts` | `build.gradle.kts` | `src/main/kotlin/` |
+
+### Language Filtering
+
+Filter to CodeQL-supported languages only:
+
+```python
+supported = detector.filter_codeql_supported(detected)
+# Automatically excludes unsupported languages with warning
+```
+
+## Build System Detection
+
+### Automatic Build Detection
+
+The build detector identifies appropriate build commands:
+
+```python
+from packages.codeql.build_detector import BuildDetector
+
+detector = BuildDetector(repo_path)
+build_system = detector.detect_build_system('java')
+
+print(f"Type: {build_system.type}")           # maven/gradle/make
+print(f"Command: {build_system.command}")     # mvn clean compile
+print(f"Working dir: {build_system.working_dir}")
+```
+
+### Supported Build Systems
+
+**Java:**
+- Maven: `pom.xml` → `mvn clean compile -DskipTests`
+- Gradle: `build.gradle` → `gradle clean build -x test`
+
+**C/C++:**
+- CMake: `CMakeLists.txt` → `cmake . && make`
+- Make: `Makefile` → `make`
+- Autotools: `configure` → `./configure && make`
+
+**JavaScript/TypeScript:**
+- npm: `package.json` → `npm install && npm run build`
+- Yarn: `yarn.lock` → `yarn install && yarn build`
+
+**Go:**
+- Go modules: `go.mod` → `go build ./...`
+
+**Python/Ruby:**
+- No-build mode (interpreted languages)
+
+### Custom Build Commands
+
+Override auto-detection:
+
+```bash
+python3 raptor_codeql.py \
+  --repo /path/to/code \
+  --languages java \
+  --build-command "mvn clean compile -DskipTests -Dcheckstyle.skip"
+```
+
+## Database Creation
+
+### Autonomous Database Creation
+
+CodeQL databases are created with automatic caching:
+
+```python
+from packages.codeql.database_manager import DatabaseManager
+
+manager = DatabaseManager()
+results = manager.create_databases_parallel(
+    repo_path,
+    language_build_map,
+    force=False  # Use cached if available
+)
+
+for lang, result in results.items():
+    if result.success:
+        print(f"✓ {lang}: {result.database_path}")
+    else:
+        print(f"✗ {lang}: {result.errors}")
+```
+
+### Database Caching
+
+Databases are cached to avoid redundant creation:
+
+```python
+# Cache key: repo_hash + language
+cache_key = f"{repo_hash}_{language}"
+db_path = RaptorConfig.CODEQL_DB_DIR / cache_key
+
+if db_path.exists() and not force:
+    logger.info(f"Using cached database: {db_path}")
+    return DatabaseResult(cached=True, database_path=db_path)
+```
+
+### Database Structure
+
+```
+codeql_dbs/
+└── a7f8e92_java/
+    ├── db-java/
+    ├── src.zip
+    ├── codeql-database.yml
+    └── log/
+        ├── database-create.log
+        └── ext/
+```
+
+### Cache Management
+
+```python
+# Configuration from core.config:
+CODEQL_DB_CACHE_DAYS = 7  # Keep for 7 days
+CODEQL_DB_AUTO_CLEANUP = True  # Auto-cleanup old DBs
+```
+
+## Query Execution
+
+### Security Suites
+
+RAPTOR uses CodeQL's security suites:
+
+```python
+# Standard security suite
+suite_name = f"{language}-security-queries"
+
+# Extended security suite (more queries, slower)
+if use_extended:
+    suite_name = f"{language}-security-extended"
+```
+
+### Parallel Query Execution
+
+```bash
+codeql database analyze \
+  /path/to/db \
+  --format=sarif-latest \
+  --output=results.sarif \
+  --threads=0 \
+  --ram=8192 \
+  java-security-queries
+```
+
+### Query Configuration
+
+From `core.config.RaptorConfig`:
+
+```python
+CODEQL_RAM_MB = 8192        # 8GB RAM for analysis
+CODEQL_THREADS = 0          # Use all available CPUs
+CODEQL_MAX_PATHS = 4        # Max dataflow paths per query
+CODEQL_ANALYZE_TIMEOUT = 2400  # 40 minutes
+```
+
+## Dataflow Validation
+
+### Dataflow Path Structure
+
+CodeQL findings include source-to-sink dataflow paths:
+
+```python
+@dataclass
+class DataflowPath:
+    source: DataflowStep        # Where tainted data originates
+    sink: DataflowStep          # Where dangerous operation occurs
+    intermediate_steps: List[DataflowStep]  # Data transformations
+    sanitizers: List[str]       # Validation functions in path
+    rule_id: str
+    message: str
+```
+
+### LLM-Powered Validation
+
+Go beyond static detection to validate exploitability:
+
+```python
+from packages.codeql.dataflow_validator import DataflowValidator
+
+validator = DataflowValidator(llm_client)
+validation = validator.validate_finding(sarif_result, repo_path)
+
+if validation.is_exploitable:
+    print(f"Exploitable (confidence: {validation.confidence:.2f})")
+    print(f"Attack complexity: {validation.attack_complexity}")
+    if validation.bypass_strategy:
+        print(f"Bypass: {validation.bypass_strategy}")
+```
+
+### Validation Criteria
+
+The validator checks:
+
+1. **Sanitizers**: Are they truly effective?
+2. **Reachability**: Is the path reachable in practice?
+3. **Barriers**: Are there hidden constraints?
+4. **Complexity**: What's the real attack difficulty?
+
+### Validation Output
+
+```python
+@dataclass
+class DataflowValidation:
+    is_exploitable: bool
+    confidence: float  # 0.0-1.0
+    sanitizers_effective: bool
+    bypass_possible: bool
+    bypass_strategy: Optional[str]
+    attack_complexity: str  # "low", "medium", "high"
+    reasoning: str
+    barriers: List[str]
+    prerequisites: List[str]
+```
+
+## Dataflow Visualization
+
+Generate visual representations of dataflow paths:
+
+```python
+from packages.codeql.dataflow_visualizer import DataflowVisualizer
+
+visualizer = DataflowVisualizer()
+visualizer.generate_visualization(
+    sarif_result,
+    repo_path,
+    output_dir / "visualizations"
+)
+```
+
+Output formats:
+- **GraphViz DOT** - Graph structure
+- **PNG** - Rendered visualization
+- **HTML** - Interactive web view
+
+## CLI Usage
+
+### Fully Autonomous Scan
+
+Auto-detect everything:
+
+```bash
+python3 raptor_codeql.py --repo /path/to/code
+```
+
+### Specify Languages
+
+Target specific languages:
+
+```bash
+python3 raptor_codeql.py \
+  --repo /path/to/code \
+  --languages java,python
+```
+
+### Extended Security Suite
+
+Use more comprehensive queries:
+
+```bash
+python3 raptor_codeql.py \
+  --repo /path/to/code \
+  --extended
+```
+
+### Force Database Rebuild
+
+Ignore cache:
+
+```bash
+python3 raptor_codeql.py \
+  --repo /path/to/code \
+  --force
+```
+
+### Scan Only (No LLM Analysis)
+
+Skip autonomous analysis phase:
+
+```bash
+python3 raptor_codeql.py \
+  --repo /path/to/code \
+  --scan-only
+```
+
+### Custom CodeQL CLI Path
+
+```bash
+python3 raptor_codeql.py \
+  --repo /path/to/code \
+  --codeql-cli /custom/path/to/codeql
+```
+
+## Autonomous Analysis
+
+### Two-Phase Workflow
+
+**Phase 1: Scanning**
+1. Detect languages
+2. Detect build systems
+3. Create databases
+4. Execute security queries
+5. Generate SARIF output
+
+**Phase 2: Analysis**
+1. LLM-powered finding analysis
+2. Dataflow path validation
+3. Exploitability scoring
+4. PoC generation
+5. Exploit compilation
+
+### Autonomous Analyzer
+
+Deep analysis of findings:
+
+```python
+from packages.codeql.autonomous_analyzer import AutonomousCodeQLAnalyzer
+
+analyzer = AutonomousCodeQLAnalyzer(
+    llm_client,
+    exploit_validator,
+    multi_turn_analyzer
+)
+
+analysis = analyzer.analyze_finding_autonomous(
+    sarif_result,
+    sarif_run,
+    repo_path,
+    out_dir
+)
+
+if analysis.exploitable:
+    print(f"Exploitability score: {analysis.analysis.exploitability_score:.2f}")
+    if analysis.exploit_code:
+        print(f"Exploit generated: {len(analysis.exploit_code)} bytes")
+```
+
+## Output Structure
+
+```
+out/codeql_project_20260304_123456/
+├── codeql_report.json              # Complete workflow results
+├── java_results.sarif              # Per-language SARIF
+├── python_results.sarif
+├── databases/
+│   ├── db-java/                    # CodeQL databases
+│   └── db-python/
+├── autonomous/
+│   ├── finding_0000_analysis.json  # LLM analysis per finding
+│   ├── finding_0001_analysis.json
+│   └── visualizations/
+│       ├── dataflow_0000.png
+│       └── dataflow_0000.dot
+└── exploits/
+    ├── exploit_0000.c              # Generated exploits
+    └── exploit_0000_compiled
+```
+
+## Workflow Results
+
+### CodeQLWorkflowResult
+
+```python
+@dataclass
+class CodeQLWorkflowResult:
+    success: bool
+    repo_path: str
+    timestamp: str
+    duration_seconds: float
+    languages_detected: Dict[str, LanguageInfo]
+    databases_created: Dict[str, DatabaseResult]
+    analyses_completed: Dict[str, QueryResult]
+    total_findings: int
+    sarif_files: List[str]
+    errors: List[str]
+```
+
+### Accessing Results
+
+```python
+from packages.codeql.agent import CodeQLAgent
+
+agent = CodeQLAgent(repo_path)
+result = agent.run_autonomous_analysis()
+
+print(f"Languages: {len(result.languages_detected)}")
+print(f"Findings: {result.total_findings}")
+print(f"Duration: {result.duration_seconds:.1f}s")
+
+for sarif in result.sarif_files:
+    print(f"  - {sarif}")
+```
+
+## Best Practices
+
+<Tip>
+**Cache databases**: Database creation is expensive (5-30 minutes). Let CodeQL cache databases between runs unless source code changes.
+</Tip>
+
+<Warning>
+**Resource requirements**: CodeQL analysis needs significant resources. Configure `CODEQL_RAM_MB` based on your system (minimum 4GB, recommended 8GB).
+</Warning>
+
+<Note>
+**Build requirements**: Compiled languages (Java, C/C++, C#) require build tools installed. CodeQL traces compilation to understand code structure.
+</Note>
+
+## Troubleshooting
+
+### Database Creation Fails
+
+```bash
+# Check CodeQL CLI
+codeql version
+
+# Validate build command manually
+cd /path/to/code
+mvn clean compile -DskipTests
+
+# Check logs
+cat codeql_dbs/*/log/database-create.log
+```
+
+### No Dataflow Paths
+
+If queries return findings without dataflow:
+
+- Ensure `--format=sarif-latest` is used
+- Check `codeFlows` field in SARIF output
+- Some queries don't produce dataflow (e.g., pattern-based)
+
+### Out of Memory
+
+Increase CodeQL RAM allocation:
+
+```python
+# In core/config.py:
+CODEQL_RAM_MB = 16384  # 16GB
+```
+
+## See Also
+
+- [Static Analysis](/testing/static-analysis) - Semgrep pattern-based scanning
+- [Exploitability Validation](/testing/exploitability-validation) - Verify findings
+- [Binary Fuzzing](/testing/binary-fuzzing) - Dynamic testing

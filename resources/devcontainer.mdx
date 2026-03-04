@@ -1,0 +1,530 @@
+---
+title: DevContainer Setup
+description: Pre-configured development environment with all RAPTOR dependencies
+---
+
+## Overview
+
+The RAPTOR devcontainer provides a complete, pre-configured development environment with all security tools, debuggers, and dependencies installed. This eliminates manual installation and ensures consistency across platforms.
+
+<Card title="What's Included" icon="box-open">
+  - Python 3.12 environment
+  - All security testing tools (Semgrep, CodeQL, AFL++)
+  - Debuggers (GDB, rr)
+  - Build tools (gcc, clang, make, cmake)
+  - Browser automation (Playwright)
+  - All Python dependencies
+</Card>
+
+---
+
+## Quick Start
+
+<Steps>
+  <Step title="Open in VS Code">
+    Open the RAPTOR repository in VS Code or any compatible editor:
+    
+    ```bash
+    git clone https://github.com/gadievron/raptor.git
+    cd raptor
+    code .
+    ```
+    
+    Then use the command: **Dev Container: Open Folder in Container**
+  </Step>
+  
+  <Step title="Wait for Build">
+    The first build takes 5-10 minutes (container is ~6GB). Subsequent starts are instant.
+  </Step>
+  
+  <Step title="Start Using RAPTOR">
+    Once the container is running, all tools are ready:
+    
+    ```bash
+    # Just say "hi" in Claude Code
+    claude
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Alternative: Docker Build
+
+Build and run the container manually with Docker:
+
+<CodeGroup>
+```bash Build Container
+docker build -f .devcontainer/Dockerfile -t raptor-devcontainer:latest .
+```
+
+```bash Run Container
+docker run --rm -it --privileged \
+  -v $(pwd):/workspaces/raptor \
+  -w /workspaces/raptor \
+  raptor-devcontainer:latest \
+  /bin/bash
+```
+</CodeGroup>
+
+<Info>
+  The `--privileged` flag is required for the rr debugger to function properly.
+</Info>
+
+---
+
+## Included Tools
+
+### Security Analysis Tools
+
+<CardGroup cols={2}>
+  <Card title="Semgrep" icon="magnifying-glass">
+    **Version:** Latest
+    
+    Pattern-based static analysis scanner
+    
+    ```bash
+    semgrep --version
+    ```
+  </Card>
+  
+  <Card title="CodeQL CLI" icon="code">
+    **Version:** 2.15.5
+    
+    Semantic code analysis engine
+    
+    ```bash
+    codeql version
+    ```
+  </Card>
+  
+  <Card title="AFL++" icon="bug">
+    **Version:** Latest
+    
+    American Fuzzy Lop fuzzer with enhancements
+    
+    ```bash
+    afl-fuzz -h
+    ```
+  </Card>
+  
+  <Card title="rr Debugger" icon="clock-rotate-left">
+    **Platform:** Linux x86_64 only
+    
+    Deterministic record-replay debugger
+    
+    ```bash
+    rr --version
+    ```
+  </Card>
+</CardGroup>
+
+### Build & Debugging Tools
+
+<Accordion title="Compilers & Build Systems">
+  - **gcc** - GNU C/C++ compiler with coverage support (gcov)
+  - **g++** - GNU C++ compiler
+  - **clang-format** - Code formatter
+  - **make** - Build automation
+  - **cmake** - Cross-platform build system
+  - **autoconf, automake, libtool** - GNU build tools
+</Accordion>
+
+<Accordion title="Debuggers">
+  - **gdb** - GNU Debugger
+  - **gdb-multiarch** - Multi-architecture debugging
+  - **rr** - Record-replay debugger (Linux x86_64)
+</Accordion>
+
+<Accordion title="Binary Analysis">
+  - **binutils** - GNU binary utilities (nm, addr2line, objdump, strings)
+  - **file** - File type identification
+</Accordion>
+
+### Web Testing (Alpha)
+
+<Warning>
+  Web testing is in alpha stage. Treat as experimental.
+</Warning>
+
+<Accordion title="Playwright Browser Automation">
+  Pre-installed browsers:
+  - Chromium
+  - Firefox
+  - WebKit
+  
+  All browser binaries are pre-downloaded during container build.
+  
+  ```bash
+  python -m playwright --version
+  ```
+</Accordion>
+
+### Python Environment
+
+- **Python:** 3.12
+- **Base Image:** `mcr.microsoft.com/devcontainers/python:1-3.12-bookworm`
+- **Dependencies:** All packages from `requirements.txt` and `requirements-dev.txt`
+- **PYTHONPATH:** Pre-configured for RAPTOR imports
+
+---
+
+## Environment Configuration
+
+The devcontainer sets up several environment variables:
+
+<CodeGroup>
+```bash Environment Variables
+# CodeQL in PATH
+PATH="/opt/codeql:$PATH"
+
+# Git configuration
+GIT_TERMINAL_PROMPT=0
+
+# Python configuration
+PYTHONUNBUFFERED=1
+PYTHONPATH="/workspaces/raptor:/workspaces/raptor/packages:$PYTHONPATH"
+```
+</CodeGroup>
+
+<Info>
+  The PYTHONPATH configuration allows importing RAPTOR packages from anywhere:
+  ```python
+  import core
+  import binary_analysis
+  import llm_analysis
+  ```
+</Info>
+
+---
+
+## Usage Instructions
+
+### Basic Workflow
+
+<Steps>
+  <Step title="Start Container">
+    Open the repository in VS Code and start the devcontainer.
+  </Step>
+  
+  <Step title="Verify Installation">
+    Check that all tools are available:
+    
+    ```bash
+    # Security tools
+    semgrep --version
+    codeql version
+    afl-fuzz -h
+    
+    # Debuggers
+    gdb --version
+    rr --version  # Linux only
+    
+    # Python packages
+    python3 -c "import anthropic; print('Ready!')"
+    ```
+  </Step>
+  
+  <Step title="Run RAPTOR">
+    Use any RAPTOR command:
+    
+    ```bash
+    # Via Claude Code
+    claude
+    # Then: /scan or /analyze /test/data
+    
+    # Via Python CLI
+    python3 raptor.py scan --repo /test/data
+    ```
+  </Step>
+</Steps>
+
+### Working Directory
+
+The container's working directory is `/workspaces/raptor`, which maps to your local repository.
+
+```bash
+cd /workspaces/raptor
+ls -la  # See your local files
+```
+
+Changes made inside the container are reflected in your local filesystem.
+
+---
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="rr debugger fails with 'Permission denied'">
+    **Problem:** rr requires kernel performance monitoring permissions.
+    
+    **Solution:**
+    
+    1. Ensure container runs with `--privileged` flag
+    2. Set kernel parameter (inside container):
+    
+    ```bash
+    echo 1 | sudo tee /proc/sys/kernel/perf_event_paranoid
+    ```
+    
+    3. Or add to devcontainer.json:
+    
+    ```json
+    {
+      "runArgs": ["--privileged"]
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="CodeQL not found in PATH">
+    **Problem:** CodeQL binary not accessible.
+    
+    **Solution:**
+    
+    1. Check installation:
+    
+    ```bash
+    ls -la /opt/codeql/codeql
+    ```
+    
+    2. Manually add to PATH:
+    
+    ```bash
+    export PATH="/opt/codeql:$PATH"
+    codeql version
+    ```
+    
+    3. Restart container if issue persists
+  </Accordion>
+  
+  <Accordion title="Python module import errors">
+    **Problem:** Cannot import RAPTOR packages.
+    
+    **Solution:**
+    
+    1. Verify PYTHONPATH:
+    
+    ```bash
+    echo $PYTHONPATH
+    # Should include: /workspaces/raptor:/workspaces/raptor/packages
+    ```
+    
+    2. Set manually if needed:
+    
+    ```bash
+    export PYTHONPATH="/workspaces/raptor:/workspaces/raptor/packages:$PYTHONPATH"
+    ```
+    
+    3. Test import:
+    
+    ```python
+    python3 -c "import core; print('Success!')"
+    ```
+  </Accordion>
+  
+  <Accordion title="Container build fails or is very slow">
+    **Problem:** First build takes 5-10 minutes and downloads ~6GB.
+    
+    **Solutions:**
+    
+    - **Slow internet:** Wait for download to complete (one-time only)
+    - **Disk space:** Ensure 10GB+ free space
+    - **Build errors:** Check Docker logs for specific errors
+    - **Platform issues:** Some tools (like rr) are Linux x86_64 only
+    
+    The container will skip unavailable tools with warnings rather than failing.
+  </Accordion>
+  
+  <Accordion title="AFL++ fuzzing not working">
+    **Problem:** AFL++ requires specific kernel configurations.
+    
+    **Solution:**
+    
+    1. Check AFL++ system settings:
+    
+    ```bash
+    afl-system-config
+    ```
+    
+    2. Apply recommended settings (may require privileged mode)
+    
+    3. For testing, use AFL++ with `-d` flag to disable CPU binding:
+    
+    ```bash
+    afl-fuzz -d -i input -o output -- ./target
+    ```
+  </Accordion>
+  
+  <Accordion title="Playwright browsers not working">
+    **Problem:** Playwright browser automation fails.
+    
+    **Solution:**
+    
+    1. Verify browsers are installed:
+    
+    ```bash
+    python -m playwright install --dry-run
+    ```
+    
+    2. Reinstall if needed:
+    
+    ```bash
+    python -m playwright install
+    ```
+    
+    3. Check X11 for GUI (if needed):
+    
+    Most Playwright operations work headless, but for debugging:
+    
+    ```bash
+    # Run headless (default)
+    python -m playwright codegen --browser chromium
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Container Size & Performance
+
+<CardGroup cols={2}>
+  <Card title="Container Size" icon="hard-drive">
+    **~6GB total**
+    
+    - Base Python 3.12 image: ~2GB
+    - Security tools: ~1.5GB
+    - Playwright browsers: ~1.5GB
+    - Build tools & dependencies: ~1GB
+  </Card>
+  
+  <Card title="Build Time" icon="clock">
+    **5-10 minutes (first time)**
+    
+    - Download: 3-5 minutes
+    - Build: 2-5 minutes
+    - Subsequent starts: &lt;10 seconds
+  </Card>
+</CardGroup>
+
+<Info>
+  The container caches layers, so rebuilds after changes are fast (typically &lt;1 minute).
+</Info>
+
+---
+
+## OSS Forensics Configuration
+
+For OSS forensics investigations, configure Google Cloud credentials:
+
+<Steps>
+  <Step title="Create Service Account">
+    1. Go to Google Cloud Console
+    2. Create a service account with BigQuery access
+    3. Download credentials JSON file
+  </Step>
+  
+  <Step title="Mount Credentials">
+    Add to devcontainer.json:
+    
+    ```json
+    {
+      "mounts": [
+        "source=${localEnv:HOME}/.config/gcloud,target=/home/vscode/.config/gcloud,type=bind"
+      ]
+    }
+    ```
+  </Step>
+  
+  <Step title="Set Environment Variable">
+    Inside container:
+    
+    ```bash
+    export GOOGLE_APPLICATION_CREDENTIALS="/path/to/credentials.json"
+    ```
+  </Step>
+</Steps>
+
+<Info>
+  See [Dependencies](/resources/dependencies) for more details on Google Cloud BigQuery setup.
+</Info>
+
+---
+
+## Customization
+
+Modify `.devcontainer/Dockerfile` to customize the environment:
+
+<CodeGroup>
+```dockerfile Add Tools
+# Add after existing RUN commands
+RUN apt-get update && apt-get install -y \
+    your-tool-here \
+    && apt-get clean
+```
+
+```dockerfile Python Packages
+# Add to requirements.txt or install directly
+RUN pip install --no-cache-dir your-package
+```
+
+```dockerfile Environment Variables
+# Add to ENV section
+ENV YOUR_VAR="your_value"
+```
+</CodeGroup>
+
+Rebuild the container after changes:
+
+```bash
+# In VS Code
+Dev Container: Rebuild Container
+
+# Or with Docker
+docker build -f .devcontainer/Dockerfile -t raptor-devcontainer:latest .
+```
+
+---
+
+## Platform Compatibility
+
+<CardGroup cols={2}>
+  <Card title="Full Support" icon="check">
+    **Linux (x86_64)**
+    
+    All tools including rr debugger
+  </Card>
+  
+  <Card title="Partial Support" icon="circle-half-stroke">
+    **macOS (ARM64) / Windows (WSL2)**
+    
+    All tools except rr debugger
+    
+    Container builds with warnings for unavailable tools
+  </Card>
+</CardGroup>
+
+<Warning>
+  The rr debugger is Linux x86_64 only. On other platforms, RAPTOR falls back to GDB/LLDB for crash analysis.
+</Warning>
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Run Tests" icon="flask" href="/resources/testing">
+    Verify your environment with the test suite
+  </Card>
+  
+  <Card title="Start Scanning" icon="radar" href="/quickstart">
+    Begin using RAPTOR for security testing
+  </Card>
+  
+  <Card title="Dependencies" icon="list" href="/resources/dependencies">
+    Learn about licenses and restrictions
+  </Card>
+  
+  <Card title="Contributing" icon="code-pull-request" href="/resources/contributing">
+    Contribute to RAPTOR development
+  </Card>
+</CardGroup>

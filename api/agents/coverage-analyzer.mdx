@@ -1,0 +1,292 @@
+---
+title: Coverage Analyzer Agent
+description: Generate gcov coverage data for code analysis
+---
+
+The Coverage Analyzer agent generates gcov coverage data for C/C++ programs, showing which lines of code were executed during a test run. This data is essential for crash analysis and verification.
+
+## Purpose
+
+Generate code coverage data that shows:
+- Which lines were executed (and how many times)
+- Which lines were not executed
+- Branch coverage information
+- Function coverage statistics
+
+## Invocation
+
+Invoked by the crash-analysis-agent as part of the crash analysis workflow.
+
+**Receives**:
+- Code repository path
+- Working directory path
+- Crashing example program and build instructions
+
+**Creates**: `gcov/` subdirectory in working directory
+
+## Workflow
+
+<Steps>
+  <Step title="Rebuild with Coverage Flags">
+    Add coverage instrumentation to the build:
+    
+    - Add `--coverage -g` to both CFLAGS and LDFLAGS
+    - Alternative: `-fprofile-arcs -ftest-coverage`
+    
+    **Autotools**:
+    ```bash
+    ./configure CFLAGS="--coverage -g" LDFLAGS="--coverage"
+    ```
+    
+    **CMake**:
+    ```bash
+    cmake -DCMAKE_C_FLAGS="--coverage -g" \
+          -DCMAKE_EXE_LINKER_FLAGS="--coverage" ..
+    ```
+    
+    **Makefile**:
+    ```bash
+    make CFLAGS="--coverage -g" LDFLAGS="--coverage"
+    ```
+  </Step>
+  
+  <Step title="Run Crashing Program">
+    ```bash
+    <crashing-command>
+    # Creates .gcda files alongside .gcno files in build directory
+    ```
+    
+    The execution generates:
+    - `.gcno` files (created at compile time - note data)
+    - `.gcda` files (created at runtime - data)
+  </Step>
+  
+  <Step title="Generate Coverage Reports">
+    ```bash
+    # Find all .gcda files and run gcov
+    find . -name "*.gcda" -exec dirname {} \; | sort -u | while read dir; do
+      (cd "$dir" && gcov *.gcda)
+    done
+    
+    # Or for specific files:
+    gcov -o <build-dir> <source-file.c>
+    ```
+  </Step>
+  
+  <Step title="Copy Coverage Files">
+    ```bash
+    find . -name "*.gcov" -exec cp {} gcov/ \;
+    ```
+  </Step>
+</Steps>
+
+## Coverage File Format
+
+Gcov files (`.gcov`) show line-by-line execution counts:
+
+```
+        -:    0:Source:example.c
+        -:    1:#include <stdio.h>
+        -:    2:
+        1:    3:int main() {
+        1:    4:    int x = 5;
+        5:    5:    for (int i = 0; i < 5; i++) {
+        5:    6:        x += i;
+        -:    7:    }
+    #####:    8:    printf("Never executed\n");
+        1:    9:    return 0;
+        -:   10:}
+```
+
+**Legend**:
+- **Number**: Line executed N times
+- **#####**: Line not executed (0 times)
+- **-**: Non-executable line (comments, declarations, blank lines)
+
+## Validation
+
+After generating coverage, validate:
+
+<Checklist>
+  - [ ] `.gcda` files were created (runtime data)
+  - [ ] `.gcov` files can be generated (human-readable coverage)
+  - [ ] Entry point of crashing program shows as executed
+  - [ ] Coverage data matches expected execution path
+</Checklist>
+
+**Manual validation**:
+
+```bash
+# Lines starting with a number were executed
+grep -E "^\s+[0-9]+:" gcov/*.gcov | head -20
+
+# Lines starting with ##### were not executed
+grep -E "^\s+#####:" gcov/*.gcov | head -20
+```
+
+**Using line-execution-checker skill**:
+
+```bash
+# Build the line checker
+g++ -o line_checker .claude/skills/crash-analysis/line-execution-checker/line_checker.cpp
+
+# Check if specific line was executed
+./line_checker <source-file.c>:<line-number>
+# Exit code 0 = executed, 1 = not executed
+```
+
+## Usage in Crash Analysis
+
+The crash-analyzer-agent uses coverage data to:
+
+1. **Verify execution path**: Confirm hypothesized code lines were actually executed
+2. **Validate causal chain**: Every line in the root-cause hypothesis must show as executed
+3. **Detect dead code**: Identify code that couldn't have contributed to crash
+4. **Cross-check with traces**: Correlate with function-level traces
+
+**Critical validation rule**:
+
+<Warning>
+  Every line of code claimed to be part of the crash's causal chain MUST show as executed in the coverage data. If not, the hypothesis is wrong.
+</Warning>
+
+## Coverage Metrics
+
+Gcov provides several coverage metrics:
+
+<Tabs>
+  <Tab title="Line Coverage">
+    Percentage of executable lines that were executed
+    
+    ```bash
+    gcov example.c
+    # Lines executed:80.00% of 10
+    ```
+  </Tab>
+  
+  <Tab title="Branch Coverage">
+    Percentage of conditional branches taken
+    
+    ```bash
+    gcov -b example.c
+    # Branches executed:75.00% of 4
+    ```
+  </Tab>
+  
+  <Tab title="Function Coverage">
+    Percentage of functions called
+    
+    ```bash
+    gcov -f example.c
+    # Functions executed:90.00% of 10
+    ```
+  </Tab>
+</Tabs>
+
+## Advanced Usage
+
+### Branch Coverage
+
+Show branch coverage details:
+
+```bash
+gcov -b -c source.c
+```
+
+Output includes:
+```
+branch  0 taken 5
+branch  1 taken 0  (never executed)
+```
+
+### Function-Level Summary
+
+```bash
+gcov -f source.c
+```
+
+Shows which functions were called:
+```
+Function 'main'
+Lines executed:100.00% of 5
+
+Function 'helper'
+Lines executed:0.00% of 3
+```
+
+### HTML Reports
+
+Generate HTML coverage reports with `lcov`:
+
+```bash
+# Capture coverage data
+lcov --capture --directory . --output-file coverage.info
+
+# Generate HTML
+genhtml coverage.info --output-directory coverage_html
+```
+
+## Performance Impact
+
+Coverage instrumentation has minimal overhead:
+
+- **Compile time**: Slightly slower (debug info + instrumentation)
+- **Runtime**: &lt;10% slowdown typically
+- **Disk space**: .gcda files can be large for complex programs
+
+<Info>
+  Much lower overhead than function tracing - suitable for longer test runs.
+</Info>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="No .gcda files generated">
+    - Program didn't execute successfully
+    - Crashed before coverage data flushed
+    - Missing write permissions
+    - Check that `--coverage` was in both CFLAGS and LDFLAGS
+  </Accordion>
+
+  <Accordion title=".gcov files empty or zeros">
+    - Wrong .gcda file used (from different build)
+    - .gcno and .gcda files don't match (rebuild needed)
+    - Run gcov from correct directory
+  </Accordion>
+
+  <Accordion title="gcov: source file not found">
+    - Run gcov from build directory
+    - Use `-o` flag to specify object file directory:
+      ```bash
+      gcov -o build/src source.c
+      ```
+  </Accordion>
+
+  <Accordion title="Coverage incomplete after crash">
+    - Coverage data written on normal exit only
+    - For crash analysis, this is expected
+    - Data shows path up to crash point
+  </Accordion>
+</AccordionGroup>
+
+## Output Structure
+
+```
+<working-dir>/gcov/
+├── file1.c.gcov
+├── file2.c.gcov
+├── header1.h.gcov
+└── module.c.gcov
+```
+
+## Related Agents
+
+<CardGroup cols={2}>
+  <Card title="Crash Analysis" icon="bug" href="/api/agents/crash-analysis">
+    Main crash analysis orchestrator
+  </Card>
+  
+  <Card title="Function Trace Generator" icon="list" href="/api/agents/function-trace-generator">
+    Complementary function-level trace generation
+  </Card>
+</CardGroup>

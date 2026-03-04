@@ -1,0 +1,132 @@
+---
+title: Introduction
+description: Learn about RAPTOR, an autonomous offensive/defensive security research framework built on Claude Code
+---
+
+## What is RAPTOR?
+
+RAPTOR is an **autonomous offensive/defensive security research framework** built on **Claude Code**. It empowers security research with agentic workflows and automation.
+
+RAPTOR stands for **R**ecursive **A**utonomous **P**enetration **T**esting and **O**bservation **R**obot.
+(We really wanted to name it RAPTOR)
+
+## Key capabilities
+
+RAPTOR autonomously:
+
+1. **Scans** your code with Semgrep and CodeQL and tries dataflow validation
+2. **Fuzzes** your binaries with American Fuzzy Lop (AFL)
+3. **Analyses** vulnerabilities using advanced LLM reasoning
+4. **Exploits** by generating proof-of-concepts
+5. **Patches** with code to fix vulnerabilities
+6. **FFmpeg-specific** patching for Google's recent disclosure
+7. **OSS Forensics** for evidence-backed GitHub repository investigations
+8. **Agentic Skills Engine** for security research & operations ([SecOpsAgentKit](https://github.com/AgentSecOps/SecOpsAgentKit))
+9. **Offensive Security Testing** via autonomous specialist agent with SecOpsAgentKit
+10. **Cost Management** with budget enforcement, real-time tracking, and quota detection
+11. **Reports** everything in structured formats
+
+RAPTOR combines traditional security tools with agentic automation and analysis, deeply understands your code, proves exploitability, and proposes patches.
+
+## What makes RAPTOR unique?
+
+Beyond RAPTOR's potential for autonomous security research and community collaboration, it demonstrates how Claude Code can be adapted for **any purpose** with RAPTOR packages.
+
+### Recent improvements
+
+- **LiteLLM Integration:** Unified LLM interface with Pydantic validation, smart model selection, and cost tracking
+- **SecOpsAgentKit:** Offensive security specialist agent with comprehensive penetration testing capabilities
+- **Cost Management:** Budget enforcement, real-time callbacks, and intelligent quota detection
+- **Enhanced Reliability:** Multiple bug fixes improving robustness across CodeQL, static analysis, and LLM providers
+
+### OSS Forensics Investigation
+
+RAPTOR includes comprehensive GitHub forensics capabilities via the `/oss-forensics` command:
+
+- **Evidence Collection:** Multi-source evidence gathering (GH Archive, GitHub API, Wayback Machine, local git)
+- **BigQuery Integration:** Query immutable GitHub event data via GH Archive
+- **Deleted Content Recovery:** Recover deleted commits, issues, and repository content
+- **IOC Extraction:** Automated extraction of indicators of compromise from vendor reports
+- **Evidence Verification:** Rigorous evidence validation against original sources
+- **Hypothesis Formation:** AI-powered evidence-backed hypothesis generation with iterative refinement
+- **Forensic Reporting:** Detailed reports with timeline, attribution, and IOCs
+
+### Offensive Security Agent
+
+RAPTOR includes an autonomous offensive security specialist agent with specialized skills from SecOpsAgentKit:
+
+- Web application security testing (SQLi, XSS, CSRF, auth bypass)
+- Network penetration testing and enumeration
+- Binary exploitation and reverse engineering
+- Fuzzing and vulnerability discovery
+- Exploit development and PoC generation
+- Security code review with adversarial mindset
+
+<Info>
+Safe operations auto-execute; dangerous operations require explicit user confirmation.
+</Info>
+
+## Architecture overview
+
+RAPTOR is a multi-layered system with progressive disclosure:
+
+### Claude Code Decision System
+
+- **Bootstrap** (CLAUDE.md) → Always loaded
+- **Tier1** (adversarial thinking, analysis-guidance, recovery) → Auto-loads when relevant
+- **Tier2** (9 expert personas) → Load on explicit request
+- **Agents** (offsec-specialist) → Autonomous offensive security operations
+- **Alpha** (custom skills) → User-created
+
+### Python Execution Layer
+
+- **raptor.py** → Unified launcher
+- **packages/** → 9 security capabilities
+- **core/** → Shared utilities
+- **engine/** → Rules and queries
+
+### Key features
+
+- **Adversarial thinking:** Prioritizes findings by Impact × Exploitability / Detection Time
+- **Decision templates:** 5 options after each scan
+- **Progressive disclosure:** 360t → 925t → up to 2,500t with personas
+- **Dual interface:** Claude Code (interactive) or Python CLI (scripting)
+
+<Warning>
+**Alpha status disclaimer**: RAPTOR was hacked together in free time, held together by vibe coding and duct tape. Consider it an early release.
+
+What will make RAPTOR truly transformative is community contributions. It's open source, modular, and extensible.
+</Warning>
+
+<Warning>
+**Automatic installation**: Unless you use the devcontainer, RAPTOR will automatically install tools without asking. Check `DEPENDENCIES.md` first.
+</Warning>
+
+## Authors
+
+Gadi Evron, Daniel Cuthbert, Thomas Dullien (Halvar Flake), Michael Bargury & John Cartwright
+
+(@gadievron, @danielcuthbert, @thomasdullien, @mbrg & @grokjc)
+
+## License
+
+MIT License - Copyright (c) 2025 Gadi Evron, Daniel Cuthbert, Thomas Dullien (Halvar Flake), and Michael Bargury
+
+Make sure to review the licenses for the various tools. For example, CodeQL does not allow commercial use.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Get up and running with RAPTOR in minutes
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Detailed installation instructions and setup
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Learn about RAPTOR's technical architecture
+  </Card>
+  <Card title="Commands" icon="terminal" href="/api/commands/scan">
+    Explore available commands and capabilities
+  </Card>
+</CardGroup>

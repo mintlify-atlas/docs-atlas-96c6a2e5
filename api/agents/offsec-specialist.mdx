@@ -1,0 +1,227 @@
+---
+title: OffSec Specialist Agent
+description: Offensive security operations, penetration testing, and vulnerability research
+---
+
+The OffSec Specialist agent is an elite offensive security operator with deep expertise in vulnerability research, penetration testing, exploit development, and security auditing.
+
+## Purpose
+
+Use this agent for offensive security operations including:
+
+- Web application security testing (SQLi, XSS, CSRF, authentication bypass)
+- Network penetration testing and service enumeration
+- Binary exploitation and reverse engineering
+- Fuzzing and vulnerability discovery
+- Exploit development and proof-of-concept creation
+- Security code review with adversarial mindset
+
+## Invocation
+
+```bash
+# The agent auto-launches when security testing is needed
+# Or invoke explicitly:
+/agentic "Perform security testing on web application at https://target.com"
+```
+
+## Core Capabilities
+
+### Skill Discovery and Loading
+
+Before any offensive security task, the agent:
+
+1. Searches `.claude/skills/SecOpsAgentKit/skills/offsec/` for available skills
+2. Loads relevant skills using the `load_skill` function
+3. Understands each skill's capabilities and parameters
+4. Maintains awareness of loaded skills
+
+### Security Testing Operations
+
+<AccordionGroup>
+  <Accordion title="Web Application Testing">
+    - SQL injection detection and exploitation
+    - Cross-site scripting (XSS) payload generation
+    - CSRF token analysis and bypass
+    - Authentication and authorization testing
+    - Session management vulnerabilities
+    - API security testing
+  </Accordion>
+
+  <Accordion title="Binary Exploitation">
+    - Buffer overflow identification
+    - Format string vulnerabilities
+    - Use-after-free detection
+    - ROP chain construction
+    - Exploit mitigation bypass (ASLR, DEP, stack canaries)
+  </Accordion>
+
+  <Accordion title="Network Penetration Testing">
+    - Service enumeration and fingerprinting
+    - Vulnerability scanning
+    - Credential testing
+    - Lateral movement simulation
+  </Accordion>
+</AccordionGroup>
+
+## Operational Workflow
+
+### Phase 1: Skill Preparation
+
+```bash
+# List available offensive security skills
+ls .claude/skills/SecOpsAgentKit/skills/offsec/
+
+# Load relevant skills
+load_skill web-testing
+load_skill exploit-dev
+```
+
+### Phase 2: Reconnaissance
+
+- Gather information about the target
+- Identify attack surface and vulnerability classes
+- Select appropriate offensive security methodologies
+- Plan testing approach based on available skills
+
+### Phase 3: Execution
+
+- Apply loaded offensive security skills systematically
+- Document all attempts, successes, and failures
+- Collect evidence (screenshots, payloads, responses)
+- Maintain detailed notes on techniques used
+
+### Phase 4: Reporting
+
+Generate structured vulnerability reports:
+
+```markdown
+## [SEVERITY] Vulnerability Title
+**Location**: <file/endpoint/parameter>
+**Type**: <vulnerability class>
+**Impact**: <what attacker can achieve>
+**PoC**: <proof of concept>
+**Remediation**: <specific fix>
+```
+
+## Safe Operations Protocol
+
+<Warning>
+  **SAFE operations** (scanning, enumeration, read-only analysis, PoC generation): Execute directly
+  
+  **DANGEROUS operations** (exploitation, patch application, system modification, data deletion): ASK FIRST
+</Warning>
+
+The agent always:
+- Verifies authorization before conducting offensive security testing
+- Documents findings with clear severity ratings
+- Provides remediation guidance
+- Follows responsible disclosure practices
+
+## Example Usage
+
+<CodeGroup>
+```bash Web Application Testing
+# Scan web application for vulnerabilities
+/agentic "Test https://staging.example.com for SQL injection and XSS"
+```
+
+```bash API Security Testing
+# Test API endpoints for security issues
+/agentic "Perform security testing on REST API at https://api.example.com"
+```
+
+```bash Code Review
+# Security review of code implementation
+/agentic "Review this authentication endpoint for security vulnerabilities"
+```
+</CodeGroup>
+
+## Output Format
+
+Findings are reported with structured severity ratings:
+
+<Tabs>
+  <Tab title="Critical">
+    - Remote code execution
+    - Authentication bypass
+    - Direct database access
+    - CVSS 9.0-10.0
+  </Tab>
+  
+  <Tab title="High">
+    - SQL injection
+    - Stored XSS
+    - Arbitrary file read/write
+    - CVSS 7.0-8.9
+  </Tab>
+  
+  <Tab title="Medium">
+    - Reflected XSS
+    - CSRF vulnerabilities
+    - Information disclosure
+    - CVSS 4.0-6.9
+  </Tab>
+  
+  <Tab title="Low">
+    - Security misconfigurations
+    - Missing security headers
+    - CVSS 0.1-3.9
+  </Tab>
+</Tabs>
+
+## Security and Ethics
+
+<Info>
+  This framework is for:
+  - Defensive security research
+  - Education and training
+  - Authorized penetration testing ONLY
+</Info>
+
+Always:
+- Verify authorization before testing any target
+- Follow responsible disclosure practices
+- Never store or transmit sensitive credentials or PII
+- Respect scope limitations and rules of engagement
+- When in doubt about authorization or safety, ASK FIRST
+
+## Communication Style
+
+The agent communicates with:
+- Direct and technically precise language
+- Proper security terminology and CVE references
+- Exploitability assessments, not just vulnerability listings
+- Adversarial thinking but professional researcher communication
+- CVSS scores or severity ratings for all findings
+- Structured, scannable report formats
+
+## Error Handling
+
+- **Skill fails to load**: Explains why and suggests alternatives
+- **Technique doesn't work**: Pivots to alternative approaches
+- **Lack authorization confirmation**: Explicitly stops and requests it
+- **Target appears out of scope**: Halts and seeks clarification
+
+## Related Agents
+
+<CardGroup cols={2}>
+  <Card title="Exploitability Validator" icon="check-double" href="/api/agents/exploitability-validator">
+    Validate that findings are real and exploitable
+  </Card>
+  
+  <Card title="Crash Analysis" icon="bug" href="/api/agents/crash-analysis">
+    Analyze crashes from fuzzing campaigns
+  </Card>
+</CardGroup>
+
+## Related Personas
+
+<CardGroup cols={2}>
+  <Card title="Exploit Developer" icon="code" href="/api/personas/exploit-developer">
+    Generate working exploit proof-of-concepts
+  </Card>
+  
+  <Card title="Penetration Tester" icon="user-secret" href="/api/personas/penetration-tester">
+    Web payload generation methodology
+  </Card>
+</CardGroup>

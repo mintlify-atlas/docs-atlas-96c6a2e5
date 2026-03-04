@@ -1,0 +1,791 @@
+---
+title: 'LLM Provider Setup'
+description: 'Configure multiple LLM providers with automatic fallback and model selection'
+icon: 'server'
+---
+
+## Overview
+
+RAPTOR uses LiteLLM to provide unified access to multiple LLM providers. Configuration supports automatic model selection, fallback chains, and custom model routing for different task types.
+
+<CardGroup cols={2}>
+  <Card title="Multi-Provider Support" icon="cloud">
+    Anthropic, OpenAI, Google Gemini, Mistral, and Ollama (local)
+  </Card>
+  <Card title="Automatic Model Selection" icon="wand-magic-sparkles">
+    Best thinking model auto-selected from LiteLLM config
+  </Card>
+  <Card title="Fallback Chains" icon="arrows-split-up-and-left">
+    Automatic fallback to alternative models on failure
+  </Card>
+  <Card title="Task-Specific Routing" icon="route">
+    Route exploit generation to Opus, classification to Gemini
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+### 1. Install LiteLLM
+
+```bash
+pip install litellm
+```
+
+### 2. Set API Keys
+
+```bash
+# Anthropic Claude
+export ANTHROPIC_API_KEY="sk-ant-..."
+
+# OpenAI GPT
+export OPENAI_API_KEY="sk-proj-..."
+
+# Google Gemini
+export GEMINI_API_KEY="AIza..."
+
+# Mistral
+export MISTRAL_API_KEY="..."
+```
+
+### 3. Run RAPTOR
+
+```bash
+# Auto-selects best available model
+python raptor_agentic.py --repo /path/to/code
+```
+
+That's it! RAPTOR automatically:
+- Detects available API keys
+- Selects the best thinking model
+- Configures fallback chains
+- Tracks costs
+
+## Provider Configuration
+
+### Anthropic Claude
+
+**Models:**
+- `claude-opus-4.5` - Most capable, best for exploit generation ($15/M tokens)
+- `claude-sonnet-4.5` - Balanced performance ($3/M tokens)
+
+**Setup:**
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+```
+
+**Manual configuration:**
+
+```python
+from packages.llm_analysis.llm.config import ModelConfig, LLMConfig
+
+claude_config = ModelConfig(
+    provider="anthropic",
+    model_name="claude-opus-4.5",
+    api_key=os.getenv("ANTHROPIC_API_KEY"),
+    max_tokens=64000,
+    temperature=0.7,
+    cost_per_1k_tokens=0.015,
+)
+
+config = LLMConfig(primary_model=claude_config)
+```
+
+<Tip>
+Use **Opus** for deep security analysis and exploit generation. Use **Sonnet** for faster analysis at lower cost.
+</Tip>
+
+### OpenAI GPT
+
+**Models:**
+- `gpt-5.2` - Latest GPT, strong reasoning ($5/M tokens)
+- `gpt-5.2-thinking` - Extended thinking mode ($6/M tokens)
+
+**Setup:**
+
+```bash
+export OPENAI_API_KEY="sk-proj-..."
+```
+
+**Manual configuration:**
+
+```python
+gpt_config = ModelConfig(
+    provider="openai",
+    model_name="gpt-5.2",
+    api_key=os.getenv("OPENAI_API_KEY"),
+    max_tokens=128000,
+    temperature=0.7,
+    cost_per_1k_tokens=0.005,
+)
+```
+
+### Google Gemini
+
+**Models:**
+- `gemini-3-pro` - High capability ($0.10/M tokens)
+- `gemini-3-deep-think` - Reasoning mode ($0.20/M tokens)
+
+**Setup:**
+
+```bash
+export GEMINI_API_KEY="AIza..."
+```
+
+**Manual configuration:**
+
+```python
+gemini_config = ModelConfig(
+    provider="gemini",
+    model_name="gemini-3-pro",
+    api_key=os.getenv("GEMINI_API_KEY"),
+    max_tokens=8192,
+    temperature=0.7,
+    cost_per_1k_tokens=0.0001,
+)
+```
+
+<Warning>
+**Important:** Use LiteLLM aliases like `gemini-3-pro`, NOT underlying model IDs like `gemini-3.0-pro-latest`. LiteLLM handles version mapping.
+</Warning>
+
+### Mistral
+
+**Models:**
+- `mistral-large-latest` - Largest model ($2/M tokens)
+
+**Setup:**
+
+```bash
+export MISTRAL_API_KEY="..."
+```
+
+**Manual configuration:**
+
+```python
+mistral_config = ModelConfig(
+    provider="mistral",
+    model_name="mistral-large-latest",
+    api_key=os.getenv("MISTRAL_API_KEY"),
+    max_tokens=128000,
+    temperature=0.7,
+    cost_per_1k_tokens=0.002,
+)
+```
+
+### Ollama (Local Models)
+
+**Models:** Any model you've pulled locally
+- `llama3:70b` - Meta's Llama 3
+- `mistral:latest` - Mistral 7B
+- `qwen2.5:72b` - Alibaba's Qwen
+- `deepseek-coder:33b` - DeepSeek Coder
+
+**Setup:**
+
+```bash
+# Install Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Pull a model
+ollama pull llama3:70b
+
+# Start server (default: http://localhost:11434)
+ollama serve
+```
+
+**Manual configuration:**
+
+```python
+ollama_config = ModelConfig(
+    provider="ollama",
+    model_name="llama3:70b",
+    api_base="http://localhost:11434",
+    max_tokens=4096,
+    temperature=0.7,
+    cost_per_1k_tokens=0.0,  # FREE!
+)
+```
+
+<Warning>
+Local models are **less reliable** for exploit generation. RAPTOR warns:
+
+```
+⚠️  Local model - exploit PoCs may be unreliable
+For production security research, consider cloud models.
+```
+</Warning>
+
+## LiteLLM Configuration File
+
+### Config File Location
+
+RAPTOR searches for LiteLLM config in order:
+
+1. `$LITELLM_CONFIG_PATH` environment variable
+2. `~/.config/litellm/config.yaml` (XDG standard)
+3. `~/Documents/ClaudeCode/litellm/config.yaml` (dev default)
+4. `/etc/litellm/config.yaml` (system-wide, Linux/macOS only)
+
+### Config File Format
+
+**~/.config/litellm/config.yaml:**
+
+```yaml
+model_list:
+  # Anthropic Claude
+  - model_name: claude-opus-4.5
+    litellm_params:
+      model: anthropic/claude-opus-4.5
+      api_key: os.environ/ANTHROPIC_API_KEY
+    model_info:
+      max_output_tokens: 64000
+      supports_reasoning: true
+  
+  - model_name: claude-sonnet-4.5
+    litellm_params:
+      model: anthropic/claude-sonnet-4.5
+      api_key: os.environ/ANTHROPIC_API_KEY
+    model_info:
+      max_output_tokens: 64000
+  
+  # OpenAI GPT
+  - model_name: gpt-5.2
+    litellm_params:
+      model: openai/gpt-5.2
+      api_key: os.environ/OPENAI_API_KEY
+    model_info:
+      max_output_tokens: 128000
+  
+  - model_name: gpt-5.2-thinking
+    litellm_params:
+      model: openai/gpt-5.2-thinking
+      api_key: os.environ/OPENAI_API_KEY
+    model_info:
+      supports_reasoning: true
+  
+  # Google Gemini
+  - model_name: gemini-3-pro
+    litellm_params:
+      model: gemini/gemini-3-pro
+      api_key: os.environ/GEMINI_API_KEY
+    model_info:
+      max_output_tokens: 8192
+  
+  - model_name: gemini-3-deep-think
+    litellm_params:
+      model: gemini/gemini-3-deep-think
+      api_key: os.environ/GEMINI_API_KEY
+    model_info:
+      supports_reasoning: true
+  
+  # Mistral
+  - model_name: mistral-large
+    litellm_params:
+      model: mistral/mistral-large-latest
+      api_key: os.environ/MISTRAL_API_KEY
+    model_info:
+      max_output_tokens: 128000
+```
+
+### Automatic Model Selection
+
+RAPTOR reads your LiteLLM config and auto-selects the best thinking model:
+
+**Selection priority:**
+
+1. Models with `supports_reasoning: true` get +10 score boost
+2. Opus models preferred over others
+3. Latest versions preferred
+4. Exact model matches preferred over aliases
+
+**Scoring system:**
+
+```python
+thinking_model_patterns = [
+    # (underlying_model, alias, base_score)
+    ("anthropic/claude-opus-4.5", "claude-opus-4.5", 110),  # Highest
+    ("openai/gpt-5.2-thinking", "gpt-5.2-thinking", 95),   # +10 = 105 with reasoning flag
+    ("gemini/gemini-3-deep-think", "gemini-3-deep-think", 90),  # +10 = 100 with reasoning
+    ("anthropic/claude-opus-4", "claude-opus-4", 85),
+    ("openai/gpt-5.2", "gpt-5.2", 80),
+    ("anthropic/claude-sonnet-4.5", "claude-sonnet-4.5", 70),
+]
+```
+
+**Example:**
+
+```python
+from packages.llm_analysis.llm.config import LLMConfig
+
+# Auto-selects best model from LiteLLM config
+config = LLMConfig()
+print(config.primary_model.provider)    # "anthropic"
+print(config.primary_model.model_name)  # "claude-opus-4.5"
+```
+
+<Tip>
+If you have multiple API keys configured, RAPTOR will automatically select the most capable model you have access to.
+</Tip>
+
+## Fallback Configuration
+
+### Automatic Fallback Chains
+
+RAPTOR builds fallback chains automatically based on available API keys:
+
+```python
+config = LLMConfig(enable_fallback=True)
+
+# If you have Claude, GPT, and Gemini keys:
+# Primary: claude-opus-4.5
+# Fallback 1: gpt-5.2
+# Fallback 2: gemini-3-pro
+
+response = client.generate(prompt)
+# If Claude fails -> tries GPT
+# If GPT fails -> tries Gemini
+# If Gemini fails -> raises error
+```
+
+### Same-Tier Fallback Rule
+
+**Fallback stays within same tier:**
+
+- **Cloud → Cloud**: Anthropic fails → try OpenAI → try Gemini
+- **Local → Local**: llama3:70b fails → try mistral:latest → try qwen2.5:72b
+
+**NEVER cross tiers:**
+
+- **Cloud ❌ Local**: Claude fails → does NOT fall back to Ollama
+- **Local ❌ Cloud**: Ollama fails → does NOT fall back to Claude
+
+**Reasoning:** If cloud provider is down, fix infrastructure or wait. Don't silently switch to lower-quality local model.
+
+```python
+# If primary is Claude (cloud)
+models_to_try = [
+    claude_opus,      # Try first
+    gpt_5,           # Cloud fallback
+    gemini_pro,      # Cloud fallback
+    # Ollama NOT included (different tier)
+]
+
+# If primary is Ollama (local)
+models_to_try = [
+    llama3,          # Try first
+    mistral,         # Local fallback
+    qwen,            # Local fallback
+    # Claude NOT included (different tier)
+]
+```
+
+### Custom Fallback Chain
+
+```python
+from packages.llm_analysis.llm.config import LLMConfig, ModelConfig
+
+config = LLMConfig(
+    primary_model=ModelConfig(
+        provider="anthropic",
+        model_name="claude-opus-4.5",
+        api_key=os.getenv("ANTHROPIC_API_KEY"),
+        cost_per_1k_tokens=0.015,
+    ),
+    fallback_models=[
+        ModelConfig(
+            provider="anthropic",
+            model_name="claude-sonnet-4.5",  # Same provider, cheaper
+            api_key=os.getenv("ANTHROPIC_API_KEY"),
+            cost_per_1k_tokens=0.003,
+        ),
+        ModelConfig(
+            provider="openai",
+            model_name="gpt-5.2",  # Different provider
+            api_key=os.getenv("OPENAI_API_KEY"),
+            cost_per_1k_tokens=0.005,
+        ),
+    ],
+    enable_fallback=True,
+)
+```
+
+### Disable Fallback
+
+```python
+config = LLMConfig(enable_fallback=False)
+
+# Will NOT fall back to other models on failure
+response = client.generate(prompt)
+# If primary fails -> immediately raises error
+```
+
+## Task-Specific Model Routing
+
+### Specialized Models
+
+Route different tasks to different models based on capability and cost:
+
+```python
+config = LLMConfig(
+    # Default: Balanced model for most tasks
+    primary_model=ModelConfig(
+        provider="anthropic",
+        model_name="claude-sonnet-4.5",
+        cost_per_1k_tokens=0.003,
+    ),
+    
+    # Task-specific overrides
+    specialized_models={
+        # Deep analysis: Use most capable model
+        "exploit_generation": ModelConfig(
+            provider="anthropic",
+            model_name="claude-opus-4.5",
+            cost_per_1k_tokens=0.015,
+        ),
+        
+        # Simple classification: Use cheapest model
+        "vulnerability_classification": ModelConfig(
+            provider="gemini",
+            model_name="gemini-3-pro",
+            cost_per_1k_tokens=0.0001,
+        ),
+        
+        # Code generation: Use specialized model
+        "patch_generation": ModelConfig(
+            provider="openai",
+            model_name="gpt-5.2",
+            cost_per_1k_tokens=0.005,
+        ),
+    },
+)
+
+client = LLMClient(config)
+
+# Uses claude-opus-4.5 (specialized)
+response = client.generate(
+    prompt="Generate exploit for buffer overflow...",
+    task_type="exploit_generation",
+)
+
+# Uses gemini-3-pro (specialized)
+response = client.generate(
+    prompt="Is this exploitable? Yes/No",
+    task_type="vulnerability_classification",
+)
+
+# Uses claude-sonnet-4.5 (primary - no override)
+response = client.generate(
+    prompt="Analyze this code for bugs...",
+)
+```
+
+### Task Type Reference
+
+| Task Type | Recommended Model | Reasoning |
+|-----------|------------------|------------|
+| `exploit_generation` | Claude Opus | Needs deep reasoning and security expertise |
+| `patch_generation` | GPT-5.2 | Strong at code generation |
+| `vulnerability_analysis` | Claude Sonnet | Balanced capability and cost |
+| `code_review` | Claude Sonnet | Good at code understanding |
+| `vulnerability_classification` | Gemini Pro | Simple yes/no, use cheapest |
+| `ioc_extraction` | Gemini Pro | Pattern matching, use cheapest |
+
+<Tip>
+**Cost optimization strategy:**
+
+- Use **Opus** for &lt;20% of requests (critical reasoning)
+- Use **Sonnet** for ~60% of requests (balanced analysis)
+- Use **Gemini** for ~20% of requests (simple classification)
+
+Typical scan cost breakdown: ~70% cheaper than Opus-only!
+</Tip>
+
+## Retry and Rate Limiting
+
+### Retry Configuration
+
+```python
+config = LLMConfig(
+    max_retries=3,
+    retry_delay=2.0,  # Local models
+    retry_delay_remote=5.0,  # Cloud APIs
+)
+```
+
+**Exponential backoff:**
+
+```python
+for attempt in range(max_retries):
+    try:
+        return provider.generate(prompt)
+    except Exception as e:
+        if attempt < max_retries - 1:
+            delay = retry_delay * (2 ** attempt)
+            logger.debug(f"Retrying in {delay}s...")
+            time.sleep(delay)
+```
+
+**Retry delays:**
+
+| Attempt | Local Delay | Remote Delay |
+|---------|-------------|-------------|
+| 1 | 2s | 5s |
+| 2 | 4s | 10s |
+| 3 | 8s | 20s |
+
+### Quota Detection
+
+Automatic detection of quota/rate limit errors:
+
+```python
+def _is_quota_error(error: Exception) -> bool:
+    # Type-based detection (robust)
+    if isinstance(error, litellm.RateLimitError):
+        return True
+    
+    # String-based detection (fallback)
+    error_str = str(error).lower()
+    return any([
+        "429" in error_str,
+        "quota exceeded" in error_str,
+        "rate limit" in error_str,
+    ])
+```
+
+**Behavior on quota error:**
+
+```
+⚠️  Quota error for anthropic/claude-opus-4.5:
+→ Anthropic rate limit exceeded
+Provider message: Request rate limit exceeded. Please retry after 60 seconds.
+
+► Falling back to: openai/gpt-5.2
+```
+
+## Advanced Configuration
+
+### Temperature and Sampling
+
+```python
+ModelConfig(
+    provider="anthropic",
+    model_name="claude-opus-4.5",
+    temperature=0.7,  # Default: balanced creativity/consistency
+)
+
+# More deterministic (exploit generation)
+ModelConfig(temperature=0.3)
+
+# More creative (vulnerability hypothesis)
+ModelConfig(temperature=0.9)
+```
+
+### Max Tokens
+
+```python
+ModelConfig(
+    provider="anthropic",
+    model_name="claude-opus-4.5",
+    max_tokens=64000,  # Maximum output length
+)
+```
+
+**Model limits:**
+
+| Provider | Model | Max Output Tokens |
+|----------|-------|------------------|
+| Anthropic | Claude Opus/Sonnet | 64,000 |
+| OpenAI | GPT-5.2 | 128,000 |
+| Google | Gemini Pro | 8,192 |
+| Ollama | Varies | 2,048-8,192 |
+
+### Timeout
+
+```python
+ModelConfig(
+    provider="anthropic",
+    model_name="claude-opus-4.5",
+    timeout=120,  # Seconds (default: 2 minutes)
+)
+```
+
+<Warning>
+Long-running requests (exploit generation, deep analysis) may need higher timeout (300-600s).
+</Warning>
+
+### Custom API Base
+
+```python
+# For Ollama or self-hosted LLMs
+ModelConfig(
+    provider="ollama",
+    model_name="llama3:70b",
+    api_base="http://192.168.1.100:11434",  # Remote Ollama server
+)
+
+# For OpenAI-compatible APIs
+ModelConfig(
+    provider="openai",
+    model_name="custom-model",
+    api_base="https://api.example.com/v1",
+)
+```
+
+## Example Configurations
+
+### High-Capability, High-Cost
+
+```python
+config = LLMConfig(
+    primary_model=ModelConfig(
+        provider="anthropic",
+        model_name="claude-opus-4.5",
+        cost_per_1k_tokens=0.015,
+    ),
+    enable_fallback=False,  # Never fall back
+    max_cost_per_scan=50.0,  # High budget
+)
+```
+
+**Use case:** High-value targets, production exploits needed
+
+### Balanced (Recommended)
+
+```python
+config = LLMConfig(
+    primary_model=ModelConfig(
+        provider="anthropic",
+        model_name="claude-sonnet-4.5",
+        cost_per_1k_tokens=0.003,
+    ),
+    specialized_models={
+        "exploit_generation": ModelConfig(
+            provider="anthropic",
+            model_name="claude-opus-4.5",
+            cost_per_1k_tokens=0.015,
+        ),
+    },
+    enable_fallback=True,
+    max_cost_per_scan=10.0,
+)
+```
+
+**Use case:** Most security research, good quality at reasonable cost
+
+### Low-Cost
+
+```python
+config = LLMConfig(
+    primary_model=ModelConfig(
+        provider="gemini",
+        model_name="gemini-3-pro",
+        cost_per_1k_tokens=0.0001,
+    ),
+    enable_fallback=True,
+    max_cost_per_scan=1.0,
+)
+```
+
+**Use case:** Exploratory scans, learning, testing
+
+### Zero-Cost (Local)
+
+```python
+config = LLMConfig(
+    primary_model=ModelConfig(
+        provider="ollama",
+        model_name="llama3:70b",
+        api_base="http://localhost:11434",
+        cost_per_1k_tokens=0.0,
+    ),
+    enable_fallback=True,  # Fall back to other local models
+    enable_cost_tracking=False,  # No cost to track
+)
+```
+
+**Use case:** Offline use, privacy-sensitive, unlimited requests
+
+## Troubleshooting
+
+<ResponseField name="No API keys found" type="error">
+  **Error:**
+  ```
+  No cloud LLM API keys found (ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY).
+  RAPTOR will use Ollama if available, or fail.
+  ```
+  
+  **Fix:** Set at least one API key:
+  ```bash
+  export ANTHROPIC_API_KEY="sk-ant-..."
+  ```
+</ResponseField>
+
+<ResponseField name="LiteLLM not installed" type="error">
+  **Error:**
+  ```
+  LiteLLM library not installed. Install with: pip install litellm
+  ```
+  
+  **Fix:**
+  ```bash
+  pip install litellm
+  ```
+</ResponseField>
+
+<ResponseField name="Model not found in LiteLLM config" type="warning">
+  **Symptom:** Auto-selection falls back to manual API key detection
+  
+  **Cause:** LiteLLM config file not found or empty
+  
+  **Fix:** Create `~/.config/litellm/config.yaml` (see Config File Format above)
+</ResponseField>
+
+<ResponseField name="Ollama connection failed" type="error">
+  **Error:**
+  ```
+  Could not connect to Ollama at http://localhost:11434
+  ```
+  
+  **Fix:**
+  ```bash
+  # Check if Ollama is running
+  curl http://localhost:11434/api/tags
+  
+  # Start Ollama
+  ollama serve
+  ```
+</ResponseField>
+
+<ResponseField name="Wrong model ID used" type="error">
+  **Symptom:** LiteLLM error about unknown model
+  
+  **Cause:** Using underlying model ID instead of LiteLLM alias
+  
+  **Wrong:**
+  ```python
+  model_name="gemini-3.0-pro-latest"  # Underlying ID
+  ```
+  
+  **Correct:**
+  ```python
+  model_name="gemini-3-pro"  # LiteLLM alias
+  ```
+</ResponseField>
+
+## Further Reading
+
+<CardGroup cols={2}>
+  <Card title="LiteLLM Documentation" icon="book" href="https://docs.litellm.ai/">
+    Official LiteLLM documentation and model support
+  </Card>
+  <Card title="Provider Setup Guides" icon="plug" href="https://docs.litellm.ai/docs/providers">
+    Detailed setup for each LLM provider
+  </Card>
+  <Card title="Cost Tracking" icon="dollar-sign" href="/advanced/cost-management">
+    Budget enforcement and cost optimization strategies
+  </Card>
+  <Card title="Configuration Reference" icon="gear" href="/reference/configuration">
+    Complete configuration options reference
+  </Card>
+</CardGroup>

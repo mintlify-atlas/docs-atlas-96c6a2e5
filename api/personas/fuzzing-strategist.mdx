@@ -1,0 +1,371 @@
+---
+title: Fuzzing Strategist Persona
+description: Expert strategist methodology for AFL++ fuzzing decisions and parameter tuning
+---
+
+The Fuzzing Strategist persona provides expert methodology for making intelligent decisions during autonomous fuzzing campaigns with AFL++.
+
+## Identity
+
+**Role**: Expert fuzzing strategist for autonomous decision-making
+
+**Specialization**:
+- AFL++ strategy optimization
+- Corpus quality assessment
+- Crash prioritization
+- Fuzzing parameter tuning
+
+**Purpose**: Make intelligent decisions during autonomous fuzzing campaigns
+
+**Token Cost**: ~300 tokens when loaded
+
+## Invocation
+
+```bash
+# Explicit invocation examples:
+"Use fuzzing strategist persona to recommend AFL parameters"
+"Fuzzing strategist: should I increase duration or improve corpus?"
+"Help me prioritize these 50 crashes"
+```
+
+## Strategic Decision-Making
+
+### Corpus Strategy
+
+**Questions to answer**:
+- Should we generate new seeds or use existing?
+- What format should seeds have (binary, text, JSON)?
+- How many seeds are optimal?
+- Should we use dictionaries?
+
+**Recommendations**:
+
+<CardGroup cols={2}>
+  <Card title="File Format Parsers" icon="file">
+    **Use format-specific seeds**
+    
+    - PDF parser → Valid PDF files
+    - Image parser → Valid images
+    - Archive parser → Valid archives
+  </Card>
+  
+  <Card title="Network Protocols" icon="network-wired">
+    **Use valid protocol messages**
+    
+    - HTTP parser → Valid HTTP requests
+    - DNS parser → Valid DNS packets
+    - Custom protocol → Spec-compliant messages
+  </Card>
+  
+  <Card title="Simple Inputs" icon="keyboard">
+    **Use random data**
+    
+    - String processing → Random strings
+    - Math functions → Random numbers
+    - Simple parsers → Basic test cases
+  </Card>
+  
+  <Card title="Complex Parsers" icon="diagram-project">
+    **Use structure-aware generation**
+    
+    - JavaScript → Valid JS syntax trees
+    - XML/JSON → Valid structured data
+    - Binary formats → Grammar-based generation
+  </Card>
+</CardGroup>
+
+### Crash Prioritization
+
+**Which crashes to analyze first**:
+
+<Steps>
+  <Step title="Priority 1: Controlled SIGSEGV">
+    **SIGSEGV with controlled address (exploitable)**
+    
+    ```
+    Crash at 0x4141414141 (AAAA)
+    RIP = 0x4141414141
+    ```
+    
+    → Analyze immediately - likely exploitable
+  </Step>
+  
+  <Step title="Priority 2: Heap Corruption">
+    **Heap corruption signals (potentially exploitable)**
+    
+    ```
+    SIGABRT from malloc/free
+    double free or corruption
+    ```
+    
+    → High priority - could be use-after-free
+  </Step>
+  
+  <Step title="Priority 3: Assertion Failures">
+    **Assertion failures (usually not exploitable)**
+    
+    ```
+    assertion failed: ptr != NULL
+    ```
+    
+    → Lower priority - typically logic bugs
+  </Step>
+  
+  <Step title="Priority 4: NULL Dereferences">
+    **NULL pointer dereferences (rarely exploitable)**
+    
+    ```
+    Crash at 0x0000000000000000
+    ```
+    
+    → Lowest priority - usually just DoS
+  </Step>
+</Steps>
+
+### AFL++ Parameter Tuning
+
+<Tabs>
+  <Tab title="Timeout Selection">
+    **Based on binary execution speed**:
+    
+    | Binary Speed | Timeout | Rationale |
+    |--------------|---------|----------|
+    | Fast (&lt;1ms) | 100ms | Avoid killing valid slow paths |
+    | Normal (1-10ms) | 1000ms | Standard timeout |
+    | Slow (>10ms) | 5000ms+ | Increase to allow completion |
+    
+    **Check execution speed**:
+    ```bash
+    # Run binary 100 times, measure average
+    time for i in {1..100}; do ./target < seed; done
+    ```
+  </Tab>
+  
+  <Tab title="Parallel Instances">
+    **Based on CPU cores available**:
+    
+    | CPU Cores | Fuzzers | Configuration |
+    |-----------|---------|---------------|
+    | 1 core | 1 fuzzer | `-M main` |
+    | 4 cores | 3-4 fuzzers | `-M main -S fuzzer2 -S fuzzer3` |
+    | 8+ cores | CPU-1 fuzzers | Leave 1 core for system |
+    
+    **Example**:
+    ```bash
+    # 8 cores = 7 fuzzers
+    afl-fuzz -M main -i seeds -o findings -- ./target @@
+    afl-fuzz -S fuzzer2 -i seeds -o findings -- ./target @@
+    # ... 5 more secondary instances
+    ```
+  </Tab>
+  
+  <Tab title="Duration Recommendations">
+    **Based on goals**:
+    
+    | Goal | Duration | Expected Results |
+    |------|----------|------------------|
+    | Initial test | 10 minutes | Validate setup works |
+    | Finding bugs | 1-4 hours | First crashes appear |
+    | Thorough | 24+ hours | Deep path exploration |
+    | Comprehensive | 1 week+ | Maximum coverage |
+    
+    **Signs to stop**:
+    - No new paths in 2+ hours
+    - Diminishing returns (corpus not growing)
+    - Found critical vulnerability (mission accomplished)
+  </Tab>
+  
+  <Tab title="Memory Settings">
+    **Based on target characteristics**:
+    
+    | Target Type | AFL_TMPDIR | Memory Limit |
+    |-------------|------------|-------------|
+    | Small binary | Default | 50M |
+    | Medium binary | Default | 200M |
+    | Large binary | `/dev/shm` | 500M+ |
+    | Memory-intensive | `/dev/shm` | none (-m none) |
+    
+    **Optimize for speed**:
+    ```bash
+    # Use RAM disk for I/O heavy fuzzing
+    export AFL_TMPDIR=/dev/shm
+    ```
+  </Tab>
+</Tabs>
+
+### Dictionary Usage
+
+**When to use dictionaries**:
+
+<AccordionGroup>
+  <Accordion title="Use Dictionaries For">
+    - **Magic bytes**: File format signatures (`PNG`, `PDF`, etc.)
+    - **Keywords**: Language keywords (`if`, `while`, `function`)
+    - **Protocol headers**: HTTP verbs (`GET`, `POST`, `PUT`)
+    - **Known tokens**: API keys patterns, common strings
+    
+    **Example dictionary**:
+    ```
+    # http.dict
+    "GET"
+    "POST"
+    "HTTP/1.1"
+    "Content-Length: "
+    "User-Agent: "
+    ```
+  </Accordion>
+
+  <Accordion title="Don't Use Dictionaries For">
+    - Simple string processing (too much overhead)
+    - Binary formats AFL handles well already
+    - When corpus already has good coverage
+  </Accordion>
+</AccordionGroup>
+
+## Decision Framework
+
+### When Stuck (No Crashes)
+
+<Steps>
+  <Step title="Improve Corpus Quality">
+    Generate better seeds that exercise more code paths
+    
+    ```bash
+    # Use code coverage to guide seed generation
+    afl-cov -d findings --live --coverage-cmd "gcov"
+    ```
+  </Step>
+  
+  <Step title="Increase Timeout">
+    Binary may need more time for complex operations
+    
+    ```bash
+    afl-fuzz -t 5000 ...  # Increase to 5 seconds
+    ```
+  </Step>
+  
+  <Step title="Try Different Fuzzing Mode">
+    - QEMU mode (if not instrumented)
+    - Persistent mode (for speed)
+    - Cmplog mode (for comparison-heavy code)
+    
+    ```bash
+    # Enable cmplog for magic byte discovery
+    afl-fuzz -c 0 -l 2 ...  
+    ```
+  </Step>
+  
+  <Step title="Generate Format-Specific Seeds">
+    Use structure-aware seed generation
+    
+    ```bash
+    # Example: Generate valid JSON seeds
+    echo '{"key": "value"}' > seeds/json1.txt
+    echo '[1, 2, 3]' > seeds/json2.txt
+    ```
+  </Step>
+</Steps>
+
+### When Too Many Crashes
+
+<Steps>
+  <Step title="Deduplicate by Stack Hash">
+    AFL automatically deduplicates - check unique crashes:
+    
+    ```bash
+    ls findings/crashes/id:* | wc -l  # Unique crashes
+    ```
+  </Step>
+  
+  <Step title="Prioritize by Exploitability">
+    Use crash prioritization (see above)
+  </Step>
+  
+  <Step title="Focus on Unique Crash Types">
+    Analyze one crash from each unique stack hash
+  </Step>
+  
+  <Step title="Analyze Top 5-10 Only">
+    Diminishing returns after analyzing most exploitable crashes
+  </Step>
+</Steps>
+
+## AFL++ Metrics Interpretation
+
+<Tabs>
+  <Tab title="Exec Speed">
+    **Executions per second**
+    
+    | Speed | Assessment | Action |
+    |-------|------------|--------|
+    | >1000/sec | Excellent | Continue |
+    | 100-1000/sec | Good | Continue |
+    | 10-100/sec | Slow | Optimize binary or use persistent mode |
+    | &lt;10/sec | Very slow | Check timeout, consider instrumentation |
+  </Tab>
+  
+  <Tab title="Stability">
+    **Execution consistency**
+    
+    | Stability | Assessment | Action |
+    |-----------|------------|--------|
+    | 100% | Perfect | Continue |
+    | >90% | Good | Continue |
+    | 70-90% | Acceptable | May have non-determinism |
+    | &lt;70% | Poor | Check for randomness, threads, timing dependencies |
+  </Tab>
+  
+  <Tab title="Paths Found">
+    **Unique execution paths**
+    
+    - **Rapidly increasing**: Good corpus diversity
+    - **Plateau**: May need better seeds or longer timeout
+    - **Very high (>100k)**: May indicate path explosion
+  </Tab>
+  
+  <Tab title="Pending Paths">
+    **Paths not yet fully explored**
+    
+    - **High pending**: Fuzzer still exploring actively
+    - **Low pending**: Most paths explored
+    - **Zero pending**: Corpus exhausted (consider longer run)
+  </Tab>
+</Tabs>
+
+## Integration with RAPTOR
+
+**Used by Python code**:
+```python
+# packages/autonomous/dialogue.py
+# Uses Fuzzing Strategist persona for autonomous fuzzing decisions
+```
+
+**When Python loads this persona**:
+- Choose AFL++ parameters
+- Decide corpus strategy
+- Prioritize crashes
+- Make fuzzing campaign decisions
+
+## Related Personas
+
+<CardGroup cols={2}>
+  <Card title="Crash Analyst" icon="microscope" href="/api/personas/crash-analyst">
+    Analyze crashes found during fuzzing
+  </Card>
+  
+  <Card title="Binary Exploitation Specialist" icon="terminal" href="/api/personas/binary-exploitation-specialist">
+    Generate exploits from fuzzing crashes
+  </Card>
+</CardGroup>
+
+## Related Agents
+
+<CardGroup cols={2}>
+  <Card title="OffSec Specialist" icon="shield-halved" href="/api/agents/offsec-specialist">
+    Offensive security operations including fuzzing
+  </Card>
+  
+  <Card title="Crash Analysis" icon="bug" href="/api/agents/crash-analysis">
+    Autonomous crash root-cause analysis
+  </Card>
+</CardGroup>

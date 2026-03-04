@@ -1,0 +1,487 @@
+---
+title: "LLM Analysis"
+description: "Autonomous AI-powered vulnerability analysis, exploit generation, and patch creation"
+icon: "brain"
+---
+
+## Overview
+
+The LLM Analysis package provides true agentic security analysis using large language models. Unlike template-based tools, it reasons about vulnerabilities contextually, generates working exploits, and creates intelligent patches.
+
+## Purpose
+
+AI-powered autonomous security with:
+- **LLM-powered analysis**: No heuristics, genuine reasoning
+- **Context-aware exploits**: Generated from actual code, not templates
+- **Intelligent patching**: Understands security context
+- **Multi-model support**: Claude, GPT-4, Ollama (DeepSeek/Qwen)
+- **Automatic fallback**: Cost optimization and reliability
+
+## Architecture
+
+```python
+packages/llm_analysis/
+├── agent.py                # Autonomous security agent
+├── crash_agent.py          # Crash analysis agent
+├── orchestrator.py         # Workflow orchestration
+└── llm/
+    ├── client.py           # LLM client with fallback
+    ├── config.py           # Model configuration
+    └── providers.py        # Provider implementations
+```
+
+## Quick Start
+
+### Analyze Findings
+
+```bash
+# Analyze SARIF findings with LLM
+python3 -m packages.llm_analysis.agent \
+  --repo /path/to/code \
+  --sarif out/combined.sarif \
+  --max-findings 10
+```
+
+### Generate Exploits
+
+```bash
+# Analyze + generate exploits for exploitable findings
+python3 -m packages.llm_analysis.agent \
+  --repo /path/to/code \
+  --sarif out/combined.sarif \
+  --generate-exploits
+```
+
+### Create Patches
+
+```bash
+# Analyze + create patches
+python3 -m packages.llm_analysis.agent \
+  --repo /path/to/code \
+  --sarif out/combined.sarif \
+  --generate-patches
+```
+
+## Python API
+
+### Autonomous Security Agent
+
+```python
+from pathlib import Path
+from packages.llm_analysis import AutonomousSecurityAgentV2
+
+# Initialize agent
+agent = AutonomousSecurityAgentV2(
+    repo_path=Path("/path/to/code"),
+    out_dir=Path("out/analysis")
+)
+
+# Analyze SARIF findings
+results = agent.analyze_sarif(
+    sarif_path=Path("out/combined.sarif"),
+    max_findings=10,
+    generate_exploits=True,
+    generate_patches=True
+)
+
+# Review results
+for result in results:
+    print(f"Finding: {result['finding_id']}")
+    print(f"Exploitable: {result['exploitable']}")
+    print(f"Score: {result['exploitability_score']}")
+    if result['exploit_code']:
+        print(f"Exploit: {result['exploit_code'][:100]}...")
+```
+
+### Analyze Single Vulnerability
+
+```python
+from packages.llm_analysis.agent import VulnerabilityContext
+
+# Create vulnerability context
+context = VulnerabilityContext(
+    finding={
+        "finding_id": "sqli-001",
+        "rule_id": "sql-injection",
+        "file": "src/api/users.py",
+        "startLine": 45,
+        "endLine": 47,
+        "message": "SQL injection vulnerability",
+        "snippet": 'query = f"SELECT * FROM users WHERE id={user_id}"'
+    },
+    repo_path=Path("/path/to/code")
+)
+
+# Read vulnerable code
+context.read_vulnerable_code()
+
+# Analyze with LLM
+analysis = agent.analyze_vulnerability(context)
+
+print(f"Exploitable: {context.exploitable}")
+print(f"Analysis: {context.analysis}")
+```
+
+### LLM Client
+
+```python
+from packages.llm_analysis.llm import LLMClient, LLMConfig
+
+# Initialize with multi-model support
+config = LLMConfig(
+    primary_model="claude-3-7-sonnet-20250219",
+    fallback_model="gpt-4o",
+    enable_local_fallback=True,
+    local_model="deepseek-r1:14b"
+)
+
+client = LLMClient(config)
+
+# Query with automatic fallback
+response = client.query(
+    system_prompt="You are a security analyst.",
+    user_prompt="Analyze this SQL injection vulnerability...",
+    temperature=0.3
+)
+
+print(response['content'])
+print(f"Model used: {response['model']}")
+print(f"Cost: ${response['cost']:.4f}")
+```
+
+## Core Classes
+
+### AutonomousSecurityAgentV2
+
+Main agent for vulnerability analysis.
+
+```python
+class AutonomousSecurityAgentV2:
+    def __init__(
+        self,
+        repo_path: Path,
+        out_dir: Path,
+        llm_config: Optional[LLMConfig] = None
+    )
+    
+    def analyze_sarif(
+        self,
+        sarif_path: Path,
+        max_findings: int = 10,
+        generate_exploits: bool = False,
+        generate_patches: bool = False
+    ) -> List[Dict[str, Any]]
+    
+    def analyze_vulnerability(
+        self,
+        context: VulnerabilityContext
+    ) -> Dict[str, Any]
+    
+    def generate_exploit(
+        self,
+        context: VulnerabilityContext
+    ) -> Optional[str]
+    
+    def generate_patch(
+        self,
+        context: VulnerabilityContext
+    ) -> Optional[str]
+```
+
+### VulnerabilityContext
+
+Complete context for vulnerability analysis.
+
+<ParamField path="finding" type="Dict[str, Any]" required>
+  SARIF finding data
+</ParamField>
+
+<ParamField path="repo_path" type="Path" required>
+  Repository path for reading source code
+</ParamField>
+
+<ResponseField name="exploitable" type="bool">
+  Whether vulnerability is exploitable
+</ResponseField>
+
+<ResponseField name="exploitability_score" type="float">
+  Score from 0.0 to 1.0
+</ResponseField>
+
+<ResponseField name="exploit_code" type="Optional[str]">
+  Generated exploit code
+</ResponseField>
+
+<ResponseField name="patch_code" type="Optional[str]">
+  Generated patch code
+</ResponseField>
+
+<ResponseField name="analysis" type="Dict[str, Any]">
+  Detailed LLM analysis
+</ResponseField>
+
+### LLMClient
+
+Multi-model LLM client with fallback.
+
+```python
+class LLMClient:
+    def __init__(self, config: LLMConfig = None)
+    
+    def query(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.3,
+        max_tokens: int = 4000
+    ) -> Dict[str, Any]
+    
+    def query_with_fallback(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        **kwargs
+    ) -> Dict[str, Any]
+```
+
+<ResponseField name="content" type="str">
+  LLM response text
+</ResponseField>
+
+<ResponseField name="model" type="str">
+  Model that generated response
+</ResponseField>
+
+<ResponseField name="cost" type="float">
+  Estimated cost in USD
+</ResponseField>
+
+<ResponseField name="tokens" type="Dict[str, int]">
+  Token usage (prompt, completion, total)
+</ResponseField>
+
+### LLMConfig
+
+Configuration for multi-model setup.
+
+<ParamField path="primary_model" type="str" default="claude-3-7-sonnet-20250219">
+  Primary model to use
+</ParamField>
+
+<ParamField path="fallback_model" type="str" default="gpt-4o">
+  Fallback if primary fails
+</ParamField>
+
+<ParamField path="enable_local_fallback" type="bool" default="True">
+  Enable local model fallback (Ollama)
+</ParamField>
+
+<ParamField path="local_model" type="str" default="deepseek-r1:14b">
+  Local model name for Ollama
+</ParamField>
+
+<ParamField path="max_retries" type="int" default="3">
+  Max retry attempts per model
+</ParamField>
+
+## Supported Models
+
+### Cloud Models
+
+| Provider | Model | Context | Cost (per 1M tokens) |
+|----------|-------|---------|----------------------|
+| Anthropic | claude-3-7-sonnet-20250219 | 200K | $3.00 / $15.00 |
+| Anthropic | claude-3-5-sonnet-20241022 | 200K | $3.00 / $15.00 |
+| OpenAI | gpt-4o | 128K | $2.50 / $10.00 |
+| OpenAI | gpt-4o-mini | 128K | $0.15 / $0.60 |
+
+### Local Models (Ollama)
+
+| Model | Size | Performance |
+|-------|------|-------------|
+| deepseek-r1:14b | 14B | Excellent reasoning |
+| qwen2.5:14b | 14B | Good general purpose |
+| qwen2.5-coder:14b | 14B | Code specialized |
+
+## Configuration
+
+### Environment Variables
+
+```bash
+# API Keys
+export ANTHROPIC_API_KEY=sk-ant-...
+export OPENAI_API_KEY=sk-...
+
+# Ollama (local)
+export OLLAMA_BASE_URL=http://localhost:11434
+
+# Model selection
+export LLM_PRIMARY_MODEL=claude-3-7-sonnet-20250219
+export LLM_FALLBACK_MODEL=gpt-4o
+export LLM_LOCAL_MODEL=deepseek-r1:14b
+```
+
+### Model Selection Strategy
+
+1. **Try primary model** (Claude 3.7 Sonnet)
+2. **If fails, try fallback** (GPT-4o)
+3. **If both fail, try local** (DeepSeek R1)
+4. **Retry each model** up to 3 times
+
+## Analysis Output
+
+### Vulnerability Analysis
+
+```json
+{
+  "finding_id": "sqli-001",
+  "rule_id": "sql-injection",
+  "file": "src/api/users.py",
+  "startLine": 45,
+  "exploitable": true,
+  "exploitability_score": 0.95,
+  "analysis": {
+    "vulnerability_type": "SQL Injection",
+    "severity": "critical",
+    "attack_vector": "Network",
+    "attack_complexity": "Low",
+    "privileges_required": "None",
+    "reasoning": "User input directly interpolated into SQL query...",
+    "exploitation_difficulty": "Easy",
+    "impact": "Complete database compromise"
+  }
+}
+```
+
+### Exploit Generation
+
+```python
+# Generated exploit code
+exploit = """
+import requests
+
+# SQL injection exploit
+url = "http://target.com/api/users"
+payload = "1' OR '1'='1' UNION SELECT username,password FROM users--"
+
+response = requests.get(url, params={'id': payload})
+print(response.json())
+"""
+```
+
+### Patch Generation
+
+```python
+# Generated patch
+patch = """
+# Before (vulnerable)
+query = f"SELECT * FROM users WHERE id={user_id}"
+
+# After (patched)
+from sqlalchemy import text
+query = text("SELECT * FROM users WHERE id=:user_id")
+result = db.execute(query, {'user_id': user_id})
+"""
+```
+
+## Dataflow Analysis
+
+The agent supports advanced dataflow analysis from CodeQL:
+
+```python
+# Vulnerability with dataflow
+context = VulnerabilityContext(
+    finding={
+        "has_dataflow": True,
+        "dataflow_path": {
+            "source": {
+                "file": "src/api/routes.py",
+                "line": 23,
+                "message": "User input from request.args"
+            },
+            "sink": {
+                "file": "src/db/queries.py",
+                "line": 45,
+                "message": "SQL query execution"
+            },
+            "steps": [
+                {"file": "src/api/routes.py", "line": 25},
+                {"file": "src/api/validation.py", "line": 12},
+                {"file": "src/db/queries.py", "line": 43}
+            ]
+        }
+    },
+    repo_path=Path("/path/to/code")
+)
+
+# Agent will analyze the complete dataflow path
+analysis = agent.analyze_vulnerability(context)
+```
+
+## Integration
+
+### With Static Analysis
+
+```python
+from packages.static_analysis import main as scan_repo
+from packages.llm_analysis import AutonomousSecurityAgentV2
+
+# 1. Scan repository
+scan_repo()  # Generates SARIF
+
+# 2. Analyze with LLM
+agent = AutonomousSecurityAgentV2(
+    repo_path=Path("/path/to/code"),
+    out_dir=Path("out/analysis")
+)
+
+results = agent.analyze_sarif(
+    sarif_path=Path("out/combined.sarif"),
+    generate_exploits=True,
+    generate_patches=True
+)
+```
+
+### With CodeQL
+
+```python
+from packages.codeql import CodeQLAgent
+from packages.llm_analysis import AutonomousSecurityAgentV2
+
+# 1. Run CodeQL
+codeql = CodeQLAgent(repo_path=Path("/path/to/code"))
+result = codeql.run()
+
+# 2. Analyze CodeQL findings with LLM
+for sarif_file in result.sarif_files:
+    agent.analyze_sarif(sarif_file, generate_exploits=True)
+```
+
+## Related Packages
+
+- [Static Analysis](/api/packages/static-analysis) - Semgrep scanning
+- [CodeQL](/api/packages/codeql) - Semantic analysis
+- [Exploitability Validation](/api/packages/exploitability-validation) - Validate findings
+- [Autonomous](/api/packages/autonomous) - Multi-turn reasoning
+
+## Performance
+
+### Analysis Speed
+
+- **Per finding**: 10-30 seconds (depends on model)
+- **Batch (10 findings)**: 3-5 minutes
+- **With exploits**: +20-40 seconds per exploitable finding
+
+### Cost Estimates
+
+- **Claude 3.7 Sonnet**: ~$0.05-0.15 per finding
+- **GPT-4o**: ~$0.03-0.10 per finding
+- **Local (Ollama)**: $0.00 (free, but slower)
+
+## Best Practices
+
+1. **Start with max_findings=10** for initial assessment
+2. **Enable exploits for critical findings** only
+3. **Use local models** for cost-free experimentation
+4. **Review patches** before applying (AI can make mistakes)
+5. **Combine with dataflow** analysis for best results

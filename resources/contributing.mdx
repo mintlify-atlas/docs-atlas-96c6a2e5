@@ -1,0 +1,667 @@
+---
+title: Contributing
+description: How to contribute to RAPTOR development
+---
+
+## Welcome Contributors!
+
+RAPTOR is in alpha and welcomes contributions from anyone, on anything. Whether you're fixing bugs, adding features, improving documentation, or sharing ideas, we appreciate your help.
+
+<Info>
+  **Community-driven:** What will make RAPTOR truly transformative is community contributions. It's open source, modular, and extensible.
+</Info>
+
+---
+
+## Quick Start for Contributors
+
+<Steps>
+  <Step title="Fork and Clone">
+    ```bash
+    # Fork on GitHub, then clone
+    git clone https://github.com/YOUR-USERNAME/raptor.git
+    cd raptor
+    ```
+  </Step>
+  
+  <Step title="Set Up Development Environment">
+    **Option 1: DevContainer (Recommended)**
+    ```bash
+    # Open in VS Code
+    code .
+    # Use: Dev Container: Open Folder in Container
+    ```
+    
+    **Option 2: Manual Setup**
+    ```bash
+    # Install dependencies
+    pip install -r requirements-dev.txt
+    pip install semgrep
+    
+    # Set up environment
+    export PYTHONPATH="$(pwd):$(pwd)/packages:$PYTHONPATH"
+    ```
+  </Step>
+  
+  <Step title="Create a Branch">
+    ```bash
+    git checkout -b feature/your-feature-name
+    ```
+  </Step>
+  
+  <Step title="Make Changes and Test">
+    ```bash
+    # Make your changes
+    
+    # Run tests
+    bash test/comprehensive_test.sh
+    
+    # Test your changes
+    python3 raptor.py scan --repo test/data
+    ```
+  </Step>
+  
+  <Step title="Submit Pull Request">
+    ```bash
+    git add .
+    git commit -m "Add: your feature description"
+    git push origin feature/your-feature-name
+    
+    # Open PR on GitHub
+    ```
+  </Step>
+</Steps>
+
+---
+
+## What to Contribute
+
+<CardGroup cols={2}>
+  <Card title="Bug Fixes" icon="bug">
+    Found a bug? Fix it!
+    - Check existing issues
+    - Create issue if new
+    - Submit fix with tests
+  </Card>
+  
+  <Card title="New Features" icon="sparkles">
+    Ideas for improvements:
+    - Better web exploitation
+    - YARA signature generation
+    - Port to Cursor/Windsurf
+    - New scan capabilities
+  </Card>
+  
+  <Card title="Documentation" icon="book">
+    Help improve docs:
+    - Fix typos
+    - Add examples
+    - Clarify instructions
+    - Write tutorials
+  </Card>
+  
+  <Card title="Testing" icon="flask">
+    Improve test coverage:
+    - Add test cases
+    - Test edge cases
+    - Report test failures
+    - Add vulnerable samples
+  </Card>
+  
+  <Card title="Integrations" icon="plug">
+    Connect RAPTOR to tools:
+    - CI/CD platforms
+    - Security scanners
+    - Bug trackers
+    - Notification systems
+  </Card>
+  
+  <Card title="Skills & Personas" icon="brain">
+    Contribute expertise:
+    - New expert personas
+    - Custom skills
+    - Analysis techniques
+    - Exploit methods
+  </Card>
+</CardGroup>
+
+---
+
+## Development Setup
+
+### Project Structure
+
+```
+raptor/
+├── raptor.py              # Main launcher
+├── raptor_agentic.py      # Agentic mode
+├── raptor_fuzzing.py      # Fuzzing mode
+├── raptor_codeql.py       # CodeQL mode
+├── core/                  # Shared utilities
+│   ├── config.py
+│   └── reporting.py
+├── packages/              # Security capabilities
+│   ├── llm_analysis/     # LLM-based analysis
+│   ├── static-analysis/  # Semgrep integration
+│   ├── codeql/           # CodeQL integration
+│   ├── fuzzing/          # AFL++ integration
+│   ├── web/              # Web testing (alpha)
+│   ├── exploit_feasibility/
+│   └── exploitability_validation/
+├── engine/                # Rules and queries
+│   ├── semgrep/rules/
+│   └── codeql/suites/
+├── .claude/               # Claude Code integration
+│   ├── commands/         # Slash commands
+│   ├── agents/           # Autonomous agents
+│   └── skills/           # Skills and techniques
+├── tiers/                 # Progressive disclosure
+│   ├── personas/         # Expert personas
+│   ├── analysis-guidance.md
+│   ├── exploit-guidance.md
+│   └── recovery.md
+├── test/                  # Test suite
+│   ├── data/             # Vulnerable samples
+│   └── *.sh              # Test scripts
+└── docs/                  # Documentation
+```
+
+### Key Components
+
+<Accordion title="Python Execution Layer">
+  **Core scripts:**
+  - `raptor.py` - Unified launcher, routes to modes
+  - `raptor_agentic.py` - Full autonomous workflow
+  - `raptor_fuzzing.py` - Binary fuzzing orchestration
+  - `raptor_codeql.py` - CodeQL database and analysis
+  
+  **When to modify:**
+  - Adding new command-line arguments
+  - Changing workflow orchestration
+  - Adding new modes
+</Accordion>
+
+<Accordion title="Packages">
+  **9 security capabilities:**
+  - `llm_analysis` - LLM-based vulnerability analysis
+  - `static-analysis` - Semgrep integration
+  - `codeql` - CodeQL semantic analysis
+  - `fuzzing` - AFL++ binary fuzzing
+  - `web` - Web application testing (alpha)
+  - `exploit_feasibility` - Binary exploit analysis
+  - `exploitability_validation` - Validation pipeline
+  - `binary_analysis` - Binary utilities
+  - `oss_forensics` - GitHub forensics
+  
+  **When to modify:**
+  - Adding new analysis capabilities
+  - Improving existing algorithms
+  - Adding new tools integration
+</Accordion>
+
+<Accordion title="Claude Code Integration">
+  **`.claude/` directory:**
+  - `CLAUDE.md` - Bootstrap instructions (always loaded)
+  - `commands/*.md` - Slash command definitions
+  - `agents/*.md` - Autonomous agent definitions
+  - `skills/` - Reusable skills and techniques
+  
+  **When to modify:**
+  - Adding new slash commands
+  - Creating new agents
+  - Adding expert personas
+  - Creating custom skills
+</Accordion>
+
+<Accordion title="Test Suite">
+  **`test/` directory:**
+  - `comprehensive_test.sh` - Full test suite
+  - `integration_tests.sh` - Tool integration tests
+  - `test_workflows.sh` - Workflow validation
+  - `data/` - Vulnerable code samples
+  
+  **When to modify:**
+  - Adding new test cases
+  - Adding vulnerable samples
+  - Testing new features
+</Accordion>
+
+---
+
+## Pull Request Guidelines
+
+### Before Submitting
+
+<Accordion title="1. Run Tests">
+  Ensure all tests pass:
+  
+  ```bash
+  # Full test suite
+  bash test/comprehensive_test.sh
+  
+  # Integration tests
+  bash test/integration_tests.sh
+  
+  # Manual testing
+  python3 raptor.py scan --repo test/data
+  python3 raptor.py agentic --repo test/data --skip-exploits
+  ```
+  
+  <Check>
+    All tests should pass before submitting PR.
+  </Check>
+</Accordion>
+
+<Accordion title="2. Code Quality">
+  Follow Python best practices:
+  
+  ```bash
+  # Check syntax
+  python3 -m py_compile your_file.py
+  
+  # Format code (optional)
+  black your_file.py
+  
+  # Check imports
+  python3 -c "import your_module"
+  ```
+  
+  **Style guidelines:**
+  - Use clear variable names
+  - Add docstrings for functions
+  - Comment complex logic
+  - Follow PEP 8 (loosely)
+</Accordion>
+
+<Accordion title="3. Documentation">
+  Update documentation:
+  
+  - Add docstrings to new functions
+  - Update README.md if adding features
+  - Add examples for new commands
+  - Update ARCHITECTURE.md for major changes
+  
+  **Example docstring:**
+  ```python
+  def analyze_vulnerability(finding: dict) -> dict:
+      """
+      Analyzes a vulnerability finding using LLM.
+      
+      Args:
+          finding: Dictionary with vulnerability details
+          
+      Returns:
+          Dictionary with analysis results
+      """
+      # Implementation
+  ```
+</Accordion>
+
+<Accordion title="4. Commit Messages">
+  Use clear, descriptive commit messages:
+  
+  **Format:**
+  ```
+  Type: Brief description (50 chars max)
+  
+  Detailed explanation if needed.
+  - What changed
+  - Why it changed
+  - Any breaking changes
+  ```
+  
+  **Types:**
+  - `Add:` New feature
+  - `Fix:` Bug fix
+  - `Update:` Enhancement to existing feature
+  - `Refactor:` Code restructuring
+  - `Docs:` Documentation only
+  - `Test:` Test additions/fixes
+  
+  **Examples:**
+  ```bash
+  git commit -m "Add: YARA signature generation from exploit patterns"
+  git commit -m "Fix: CodeQL database creation fails on Windows WSL2"
+  git commit -m "Docs: Clarify LiteLLM configuration examples"
+  ```
+</Accordion>
+
+### PR Template
+
+```markdown
+## Description
+[Brief description of changes]
+
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Breaking change
+- [ ] Documentation update
+
+## Testing
+- [ ] All tests pass
+- [ ] Added new tests
+- [ ] Manually tested
+
+## Checklist
+- [ ] Code follows project style
+- [ ] Documentation updated
+- [ ] No breaking changes (or documented)
+- [ ] Tests added/updated
+```
+
+---
+
+## Adding New Features
+
+### Adding a New Package
+
+<Steps>
+  <Step title="Create Package Directory">
+    ```bash
+    mkdir packages/your_package
+    touch packages/your_package/__init__.py
+    ```
+  </Step>
+  
+  <Step title="Implement Core Logic">
+    ```python
+    # packages/your_package/api.py
+    def your_main_function(target: str) -> dict:
+        """
+        Main entry point for your package.
+        """
+        # Implementation
+        return results
+    ```
+  </Step>
+  
+  <Step title="Add Tests">
+    ```bash
+    mkdir packages/your_package/tests
+    touch packages/your_package/tests/test_your_package.py
+    ```
+    
+    ```python
+    # packages/your_package/tests/test_your_package.py
+    def test_your_function():
+        result = your_main_function("test_input")
+        assert result is not None
+    ```
+  </Step>
+  
+  <Step title="Integrate with Launcher">
+    ```python
+    # raptor.py
+    elif mode == "your-mode":
+        from packages.your_package.api import your_main_function
+        results = your_main_function(args.target)
+    ```
+  </Step>
+  
+  <Step title="Add Documentation">
+    ```bash
+    # Update docs/EXTENDING_LAUNCHER.md
+    # Add usage examples
+    # Document API
+    ```
+  </Step>
+</Steps>
+
+### Adding a New Command
+
+<Steps>
+  <Step title="Create Command File">
+    ```markdown
+    # .claude/commands/your-command.md
+    # /your-command - Brief description
+    
+    Detailed description of what the command does.
+    
+    **Usage:**
+    ```
+    /your-command ARGS
+    ```
+    
+    **Examples:**
+    ```
+    /your-command example1
+    /your-command example2
+    ```
+    ```
+  </Step>
+  
+  <Step title="Register in CLAUDE.md">
+    ```markdown
+    # CLAUDE.md
+    ## COMMANDS
+    
+    /your-command - Brief description
+    ```
+  </Step>
+  
+  <Step title="Implement Logic">
+    Either:
+    1. Add to existing Python script
+    2. Create new script (e.g., `raptor_your_command.py`)
+    3. Add to launcher routing
+  </Step>
+</Steps>
+
+### Adding an Expert Persona
+
+<Steps>
+  <Step title="Create Persona File">
+    ```markdown
+    # tiers/personas/your_expert.md
+    # Your Expert Name - Domain Expertise
+    
+    **Background:** [Expert background]
+    
+    **Expertise:**
+    - Skill 1
+    - Skill 2
+    
+    **Approach:**
+    [How the expert analyzes problems]
+    
+    **When to invoke:** [Use cases]
+    ```
+  </Step>
+  
+  <Step title="Add to README">
+    ```markdown
+    # tiers/personas/README.md
+    | Persona | Expert | Purpose |
+    | Your Expert | Your Name | Your domain |
+    ```
+  </Step>
+</Steps>
+
+---
+
+## Code Review Process
+
+<Steps>
+  <Step title="Submit PR">
+    Create pull request with clear description and examples.
+  </Step>
+  
+  <Step title="Automated Checks">
+    GitHub Actions runs:
+    - Syntax validation
+    - Test suite
+    - CodeQL scanning (if applicable)
+  </Step>
+  
+  <Step title="Maintainer Review">
+    Maintainers review:
+    - Code quality
+    - Tests coverage
+    - Documentation
+    - Breaking changes
+  </Step>
+  
+  <Step title="Address Feedback">
+    Make requested changes:
+    ```bash
+    git add .
+    git commit -m "Update: address review feedback"
+    git push
+    ```
+  </Step>
+  
+  <Step title="Merge">
+    Once approved, maintainers merge your PR.
+  </Step>
+</Steps>
+
+---
+
+## Development Resources
+
+<CardGroup cols={2}>
+  <Card title="Architecture Guide" icon="diagram-project" href="/architecture">
+    Understand RAPTOR's technical architecture
+  </Card>
+  
+  <Card title="Extending Launcher" icon="code" href="https://github.com/gadievron/raptor/blob/main/docs/EXTENDING_LAUNCHER.md">
+    How to add new capabilities
+  </Card>
+  
+  <Card title="Testing Guide" icon="flask" href="/resources/testing">
+    Test suite documentation
+  </Card>
+  
+  <Card title="Dependencies" icon="list" href="/resources/dependencies">
+    External tools and licenses
+  </Card>
+</CardGroup>
+
+---
+
+## Community
+
+### Communication Channels
+
+<Card title="Slack Community" icon="slack">
+  **Join #raptor channel on Prompt||GTFO Slack:**
+  
+  https://join.slack.com/t/promptgtfo/shared_invite/zt-3kbaqgq2p-O8MAvwU1SPc10KjwJ8MN2w
+  
+  **Great for:**
+  - Questions about development
+  - Discussing new features
+  - Getting help with contributions
+  - Sharing ideas
+</Card>
+
+<Card title="GitHub Issues" icon="github">
+  **Use for:**
+  - Bug reports
+  - Feature requests
+  - Documentation issues
+  - Security vulnerabilities
+  
+  https://github.com/gadievron/raptor/issues
+</Card>
+
+### Contribution Ideas
+
+Looking for something to work on? Here are some ideas:
+
+<AccordionGroup>
+  <Accordion title="Easy (Good First Issues)">
+    - Fix typos in documentation
+    - Add more test cases
+    - Improve error messages
+    - Add usage examples
+    - Update dependencies
+  </Accordion>
+  
+  <Accordion title="Medium">
+    - Add new Semgrep rules
+    - Improve web exploitation module
+    - Add new expert personas
+    - Create custom skills
+    - Improve test coverage
+    - Add integration with bug trackers
+  </Accordion>
+  
+  <Accordion title="Hard">
+    - Port to Cursor/Windsurf/Copilot
+    - YARA signature generation
+    - Advanced exploit techniques
+    - Machine learning for prioritization
+    - Distributed fuzzing
+    - Custom CodeQL queries
+  </Accordion>
+  
+  <Accordion title="Fun Ideas">
+    - Hacker poetry generator
+    - ASCII art raptor animations
+    - Custom reporting templates
+    - Integration with security conferences (CTF scoreboard)
+    - Gamification of security research
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Recognition
+
+We appreciate all contributions! Contributors are:
+
+✅ Listed in commit history
+✅ Mentioned in release notes
+✅ Credited in documentation
+✅ Part of the RAPTOR community
+
+**Current contributors:**
+- Gadi Evron (@gadievron)
+- Daniel Cuthbert (@danielcuthbert)
+- Thomas Dullien / Halvar Flake (@thomasdullien)
+- Michael Bargury (@mbrg)
+- John Cartwright (@grokjc)
+- **YOU?** 🦖
+
+---
+
+## License
+
+By contributing to RAPTOR, you agree that your contributions will be licensed under the MIT License.
+
+**RAPTOR License:**
+- MIT License
+- Copyright (c) 2025 Gadi Evron, Daniel Cuthbert, Thomas Dullien (Halvar Flake), Michael Bargury
+
+**Your contributions:**
+- Retain your copyright
+- Licensed under MIT (same as RAPTOR)
+- Can be used, modified, distributed freely
+
+See LICENSE file for full text.
+
+---
+
+## Questions?
+
+<CardGroup cols={2}>
+  <Card title="Slack" icon="slack" href="https://join.slack.com/t/promptgtfo/shared_invite/zt-3kbaqgq2p-O8MAvwU1SPc10KjwJ8MN2w">
+    Ask on #raptor channel
+  </Card>
+  
+  <Card title="GitHub Issues" icon="github" href="https://github.com/gadievron/raptor/issues">
+    Open an issue
+  </Card>
+</CardGroup>
+
+---
+
+## Thank You!
+
+<Card title="We appreciate you!" icon="heart">
+  Thank you for contributing to RAPTOR. Together, we're building an autonomous security research framework that will transform how we find and fix vulnerabilities.
+  
+  **Get them bugs!** 🦖
+</Card>
